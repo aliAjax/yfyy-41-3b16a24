@@ -92,7 +92,8 @@ export function BatchImportModal() {
       setParsedRows(validatedRows);
       setHasParsed(true);
       setImportResult(null);
-    } catch (error) {
+    } catch (parseError) {
+      console.error('CSV解析错误:', parseError);
       setImportResult({ success: false, message: 'CSV解析失败，请检查格式' });
       setParsedRows([]);
       setHasParsed(false);

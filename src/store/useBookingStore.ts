@@ -3,7 +3,7 @@ import { Booking, ViewMode, BookingFormData, MeetingRoom } from '../types';
 import { MEETING_ROOMS } from '../constants';
 import { getBookingsFromStorage, saveBookingsToStorage } from '../utils/storage';
 import { generateId, hasConflict } from '../utils/dateUtils';
-import { ImportResult, ParsedBookingRow } from '../utils/importUtils';
+import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
 
 interface BookingStore {
   bookings: Booking[];
@@ -86,26 +86,29 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
 
   batchAddBookings: (validRows) => {
     const { bookings } = get();
-    const validBookings = validRows.filter((r) => r.isValid && r.formData);
 
-    if (validBookings.length === 0) {
+    const rawDataRows = validRows.map((r) => r.rawData);
+    const revalidated = validateParsedRows(rawDataRows, bookings);
+
+    const invalidCount = revalidated.filter((r) => !r.isValid).length;
+    if (invalidCount > 0) {
       return {
         success: false,
-        totalCount: validRows.length,
-        successCount: 0,
-        failedCount: validRows.length,
-        message: '没有有效的预定数据可导入',
+        totalCount: revalidated.length,
+        successCount: revalidated.length - invalidCount,
+        failedCount: invalidCount,
+        message: `写入前校验发现 ${invalidCount} 条数据不合法，请刷新预览后重试`,
       };
     }
 
-    const hasInvalid = validRows.some((r) => !r.isValid);
-    if (hasInvalid) {
+    const validBookings = revalidated.filter((r) => r.isValid && r.formData);
+    if (validBookings.length === 0) {
       return {
         success: false,
-        totalCount: validRows.length,
-        successCount: validBookings.length,
-        failedCount: validRows.length - validBookings.length,
-        message: '存在校验不通过的行，请修正后再导入',
+        totalCount: revalidated.length,
+        successCount: 0,
+        failedCount: revalidated.length,
+        message: '没有有效的预定数据可导入',
       };
     }
 
@@ -122,7 +125,7 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
 
     return {
       success: true,
-      totalCount: validRows.length,
+      totalCount: revalidated.length,
       successCount: newBookings.length,
       failedCount: 0,
       bookings: newBookings,
