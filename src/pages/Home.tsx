@@ -1,6 +1,7 @@
 import { useBookingStore } from '../store/useBookingStore';
 import { Header } from '../components/Header';
 import { RoomList } from '../components/RoomList';
+import { RoomRanking } from '../components/RoomRanking';
 import { CalendarView } from '../components/CalendarView';
 import { BookingForm } from '../components/BookingForm';
 import { BookingDetailModal } from '../components/BookingDetailModal';
@@ -39,10 +40,15 @@ export default function Home() {
           
           <div className="flex-1 min-h-0 grid grid-cols-[256px_1fr_320px] gap-6 min-w-0">
             <div
-              className="h-full"
+              className="h-full flex flex-col gap-4 min-h-0"
               style={{ animation: 'slideInLeft 0.5s ease-out' }}
             >
-              <RoomList />
+              <div className="flex-shrink-0">
+                <RoomList />
+              </div>
+              <div className="flex-1 min-h-0">
+                <RoomRanking />
+              </div>
             </div>
             
             <div
