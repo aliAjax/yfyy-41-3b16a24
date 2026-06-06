@@ -1,4 +1,4 @@
-import { Booking, ViewMode, MeetingRoom } from '../types';
+import { Booking, ViewMode } from '../types';
 import { MEETING_ROOMS } from '../constants';
 import { formatDate, getBookingsForDate, getBookingsForWeek } from './dateUtils';
 import { startOfWeek, addDays } from 'date-fns';
