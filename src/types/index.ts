@@ -16,6 +16,7 @@ export interface Booking {
   endTime: string;
   contact: string;
   phone: string;
+  remarks?: string;
   createdAt: string;
 }
 
@@ -50,6 +51,7 @@ export interface BookingFormData {
   endTime: string;
   contact: string;
   phone: string;
+  remarks: string;
 }
 
 export interface BookingTemplate {
@@ -60,5 +62,6 @@ export interface BookingTemplate {
   attendees: number;
   contact: string;
   phone: string;
+  remarks: string;
   createdAt: string;
 }

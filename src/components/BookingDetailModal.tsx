@@ -1,4 +1,4 @@
-import { X, Calendar, Clock, Users, Building2, User, Phone, Trash2, MapPin } from 'lucide-react';
+import { X, Calendar, Clock, Users, Building2, User, Phone, Trash2, MapPin, StickyNote } from 'lucide-react';
 import { Booking } from '../types';
 import { MEETING_ROOMS } from '../constants';
 import { formatDateTime, formatTime } from '../utils/dateUtils';
@@ -138,6 +138,18 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
                 <p className="text-sm text-slate-700">{room?.location}</p>
               </div>
             </div>
+
+            {booking.remarks && (
+              <div className="flex items-start gap-3">
+                <StickyNote className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-400 mb-1">预定备注</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">
+                    {booking.remarks}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

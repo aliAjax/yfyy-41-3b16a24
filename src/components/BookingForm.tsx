@@ -38,6 +38,7 @@ export function BookingForm() {
     endTime: '10:00',
     contact: '',
     phone: '',
+    remarks: '',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -96,7 +97,7 @@ export function BookingForm() {
     }
   }, [formData.startTime, formData.endTime, formData.date, selectedRoomId, checkConflict]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -144,6 +145,7 @@ export function BookingForm() {
       attendees: formData.attendees,
       contact: formData.contact,
       phone: formData.phone,
+      remarks: formData.remarks,
     });
 
     setNewTemplateName('');
@@ -165,6 +167,7 @@ export function BookingForm() {
       attendees: template.attendees,
       contact: template.contact,
       phone: template.phone,
+      remarks: template.remarks,
     }));
     setShowTemplates(false);
   };
@@ -208,6 +211,7 @@ export function BookingForm() {
       endTime: `${formData.date}T${formData.endTime}:00`,
       contact: formData.contact,
       phone: formData.phone,
+      remarks: formData.remarks,
     });
 
     setTimeout(() => {
@@ -223,6 +227,7 @@ export function BookingForm() {
           attendees: 1,
           contact: '',
           phone: '',
+          remarks: '',
         }));
       } else {
         setError(result.message);
@@ -519,6 +524,21 @@ export function BookingForm() {
             onChange={handleChange}
             placeholder="请输入联系电话（选填）"
             className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
+            <FileText className="w-4 h-4 text-slate-400" />
+            预定备注
+          </label>
+          <textarea
+            name="remarks"
+            value={formData.remarks}
+            onChange={handleChange}
+            placeholder="请输入会议备注（选填）"
+            rows={3}
+            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
           />
         </div>
 

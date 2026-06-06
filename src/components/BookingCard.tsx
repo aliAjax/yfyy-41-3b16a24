@@ -44,6 +44,11 @@ export function BookingCard({ booking, onClick, compact = false }: BookingCardPr
           {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
         </div>
       )}
+      {height > 80 && booking.remarks && (
+        <div className="text-white/60 text-xs mt-1 truncate">
+          {booking.remarks}
+        </div>
+      )}
       
       <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors rounded-lg"></div>
     </div>
