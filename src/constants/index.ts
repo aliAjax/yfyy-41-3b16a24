@@ -45,3 +45,10 @@ export const STORAGE_KEYS = {
 export const BUSINESS_START_HOUR = 8;
 export const BUSINESS_END_HOUR = 20;
 export const HOUR_HEIGHT = 60;
+
+export const ADJACENT_SEARCH_STEP_MINUTES = 30;
+export const ADJACENT_MAX_SEARCH_STEPS = 24;
+
+export const CAPACITY_MATCH_PERFECT_RATIO = 0.95;
+export const CAPACITY_MATCH_GOOD_RATIO = 0.7;
+export const CAPACITY_MATCH_LARGE_RATIO = 0.4;

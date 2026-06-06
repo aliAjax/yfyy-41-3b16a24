@@ -25,6 +25,13 @@ import {
 } from '../utils/storage';
 import { generateId, hasConflict } from '../utils/dateUtils';
 import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
+import {
+  ADJACENT_SEARCH_STEP_MINUTES,
+  ADJACENT_MAX_SEARCH_STEPS,
+  CAPACITY_MATCH_PERFECT_RATIO,
+  CAPACITY_MATCH_GOOD_RATIO,
+  CAPACITY_MATCH_LARGE_RATIO,
+} from '../constants';
 
 interface BookingStore {
   bookings: Booking[];
@@ -299,7 +306,6 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const { bookings, getActiveRooms, getCapacityMatchInfo } = get();
     const startDateTime = new Date(`${date}T${startTime}:00`);
     const endDateTime = new Date(`${date}T${endTime}:00`);
-    const durationMs = endDateTime.getTime() - startDateTime.getTime();
     const activeRooms = getActiveRooms();
 
     const availableRooms = activeRooms.filter((room) => {
@@ -333,13 +339,13 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const adjacentSuggestions: AdjacentTimeSlot[] = [];
     if (recommendations.length === 0) {
       const roomsWithEnoughCapacity = activeRooms.filter((room) => room.capacity >= attendees);
-      const stepMinutes = 30;
-      const maxSearchSteps = 24;
+      const stepMinutes = ADJACENT_SEARCH_STEP_MINUTES;
+      const maxSearchSteps = ADJACENT_MAX_SEARCH_STEPS;
 
       for (const room of roomsWithEnoughCapacity) {
         const matchInfo = getCapacityMatchInfo(room.capacity, attendees);
 
-        for (let direction of ['earlier', 'later'] as const) {
+        for (const direction of ['earlier', 'later'] as const) {
           for (let step = 1; step <= maxSearchSteps; step++) {
             const offsetMs = direction === 'earlier'
               ? -step * stepMinutes * 60 * 1000
@@ -393,11 +399,11 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const diff = roomCapacity - attendees;
     const ratio = attendees / roomCapacity;
 
-    if (diff === 0 || ratio >= 0.95) {
+    if (diff === 0 || ratio >= CAPACITY_MATCH_PERFECT_RATIO) {
       return { level: 'perfect' as CapacityMatchLevel, text: '刚好合适', diff };
-    } else if (ratio >= 0.7) {
+    } else if (ratio >= CAPACITY_MATCH_GOOD_RATIO) {
       return { level: 'good' as CapacityMatchLevel, text: '容量适中', diff };
-    } else if (ratio >= 0.4) {
+    } else if (ratio >= CAPACITY_MATCH_LARGE_RATIO) {
       return { level: 'large' as CapacityMatchLevel, text: '容量偏大', diff };
     } else {
       return { level: 'far' as CapacityMatchLevel, text: '距离当前选择较远', diff };
