@@ -2,6 +2,7 @@ import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, LayoutList } from 'luc
 import { useBookingStore } from '../store/useBookingStore';
 import { formatDate } from '../utils/dateUtils';
 import { addDays, startOfWeek, addWeeks } from 'date-fns';
+import { ExportButton } from './ExportButton';
 
 export function Header() {
   const { viewMode, setViewMode, currentDate, setCurrentDate } = useBookingStore();
@@ -96,8 +97,11 @@ export function Header() {
             </button>
           </div>
 
-          <div className="text-right">
-            <p className="text-sm font-medium">{getDateDisplay()}</p>
+          <div className="flex items-center gap-3">
+            <ExportButton />
+            <div className="text-right">
+              <p className="text-sm font-medium">{getDateDisplay()}</p>
+            </div>
           </div>
         </div>
       </div>
