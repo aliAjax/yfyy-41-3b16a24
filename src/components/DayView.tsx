@@ -1,12 +1,13 @@
 import { useBookingStore } from '../store/useBookingStore';
 import { getBookingsForDate, formatDate, isToday } from '../utils/dateUtils';
 import { BookingCard } from './BookingCard';
-import { BUSINESS_START_HOUR, BUSINESS_END_HOUR, HOUR_HEIGHT, MEETING_ROOMS } from '../constants';
+import { BUSINESS_START_HOUR, BUSINESS_END_HOUR, HOUR_HEIGHT } from '../constants';
+import { Booking } from '../types';
 
 interface DayViewProps {
   date: Date;
   roomId?: string;
-  onBookingClick?: (booking: any) => void;
+  onBookingClick?: (booking: Booking) => void;
   showHeader?: boolean;
 }
 
@@ -15,7 +16,6 @@ export function DayView({ date, roomId, onBookingClick, showHeader = false }: Da
   const actualRoomId = roomId || selectedRoomId;
   
   const dayBookings = getBookingsForDate(bookings, date, actualRoomId);
-  const room = MEETING_ROOMS.find((r) => r.id === actualRoomId);
   
   const hours = [];
   for (let h = BUSINESS_START_HOUR; h < BUSINESS_END_HOUR; h++) {

@@ -1,7 +1,7 @@
 import { useBookingStore } from '../store/useBookingStore';
 import { getWeekDays, getBookingsForDate, formatDate, isToday } from '../utils/dateUtils';
 import { BookingCard } from './BookingCard';
-import { BUSINESS_START_HOUR, BUSINESS_END_HOUR, HOUR_HEIGHT, MEETING_ROOMS } from '../constants';
+import { BUSINESS_START_HOUR, BUSINESS_END_HOUR, HOUR_HEIGHT } from '../constants';
 import { Booking } from '../types';
 
 interface WeekViewProps {
@@ -11,7 +11,6 @@ interface WeekViewProps {
 export function WeekView({ onBookingClick }: WeekViewProps) {
   const { currentDate, bookings, selectedRoomId } = useBookingStore();
   const weekDays = getWeekDays(currentDate);
-  const room = MEETING_ROOMS.find((r) => r.id === selectedRoomId);
   
   const hours = [];
   for (let h = BUSINESS_START_HOUR; h < BUSINESS_END_HOUR; h++) {
