@@ -51,3 +51,14 @@ export interface BookingFormData {
   contact: string;
   phone: string;
 }
+
+export interface BookingTemplate {
+  id: string;
+  name: string;
+  title: string;
+  department: string;
+  attendees: number;
+  contact: string;
+  phone: string;
+  createdAt: string;
+}

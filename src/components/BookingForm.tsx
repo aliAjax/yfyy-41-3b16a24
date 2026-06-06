@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -10,10 +10,22 @@ import {
   AlertCircle,
   CheckCircle,
   Send,
+  BookmarkPlus,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  Play,
+  Plus,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
 import { MEETING_ROOMS } from '../constants';
 import { format } from 'date-fns';
+import { BookingTemplate } from '../types';
+import {
+  getTemplatesFromStorage,
+  addTemplateToStorage,
+  deleteTemplateFromStorage,
+} from '../utils/storage';
 
 export function BookingForm() {
   const { selectedRoomId, currentDate, addBooking, checkConflict, prefilledFormData, setPrefilledFormData } = useBookingStore();
@@ -31,6 +43,11 @@ export function BookingForm() {
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [conflictWarning, setConflictWarning] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<BookingTemplate[]>([]);
+  const [isAddingTemplate, setIsAddingTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [templateError, setTemplateError] = useState('');
 
   const room = MEETING_ROOMS.find((r) => r.id === selectedRoomId);
 
@@ -87,6 +104,69 @@ export function BookingForm() {
     }));
     setError('');
     setSuccess(false);
+  };
+
+  const loadTemplates = () => {
+    const data = getTemplatesFromStorage();
+    setTemplates(
+      data.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+    );
+  };
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const handleAddTemplate = () => {
+    if (!newTemplateName.trim()) {
+      setTemplateError('请输入模板名称');
+      return;
+    }
+    if (!formData.title.trim()) {
+      setTemplateError('会议主题不能为空');
+      return;
+    }
+    if (!formData.department.trim()) {
+      setTemplateError('使用科室不能为空');
+      return;
+    }
+    if (!formData.contact.trim()) {
+      setTemplateError('联系人不能为空');
+      return;
+    }
+
+    addTemplateToStorage({
+      name: newTemplateName.trim(),
+      title: formData.title,
+      department: formData.department,
+      attendees: formData.attendees,
+      contact: formData.contact,
+      phone: formData.phone,
+    });
+
+    setNewTemplateName('');
+    setIsAddingTemplate(false);
+    setTemplateError('');
+    loadTemplates();
+  };
+
+  const handleDeleteTemplate = (id: string) => {
+    deleteTemplateFromStorage(id);
+    loadTemplates();
+  };
+
+  const handleApplyTemplate = (template: BookingTemplate) => {
+    setFormData((prev) => ({
+      ...prev,
+      title: template.title,
+      department: template.department,
+      attendees: template.attendees,
+      contact: template.contact,
+      phone: template.phone,
+    }));
+    setShowTemplates(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -161,11 +241,128 @@ export function BookingForm() {
   return (
     <div className="w-80 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-full overflow-hidden">
       <div className="p-6 pb-4">
-        <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-          <div className="w-1 h-5 bg-emerald-500 rounded-full"></div>
-          新建预定
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <div className="w-1 h-5 bg-emerald-500 rounded-full"></div>
+            新建预定
+          </h2>
+          <button
+            onClick={() => {
+              setShowTemplates(!showTemplates);
+              setIsAddingTemplate(false);
+              setTemplateError('');
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              showTemplates
+                ? 'bg-amber-100 text-amber-700'
+                : 'text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            <BookmarkPlus className="w-4 h-4" />
+            模板
+            {showTemplates ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </div>
       </div>
+
+      {showTemplates && (
+        <div className="px-6 pb-4">
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-amber-800">常用模板</span>
+              {!isAddingTemplate && (
+                <button
+                  onClick={() => setIsAddingTemplate(true)}
+                  className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  保存当前
+                </button>
+              )}
+            </div>
+
+            {isAddingTemplate && (
+              <div className="mb-3">
+                <input
+                  type="text"
+                  value={newTemplateName}
+                  onChange={(e) => {
+                    setNewTemplateName(e.target.value);
+                    setTemplateError('');
+                  }}
+                  placeholder="请输入模板名称"
+                  className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent mb-2"
+                  autoFocus
+                />
+                {templateError && (
+                  <p className="text-xs text-red-600 mb-2">{templateError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddTemplate}
+                    className="flex-1 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-lg transition-colors"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAddingTemplate(false);
+                      setNewTemplateName('');
+                      setTemplateError('');
+                    }}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium rounded-lg border border-amber-200 transition-colors"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {templates.length === 0 ? (
+              <div className="text-center py-4 text-amber-600">
+                <p className="text-xs">暂无模板</p>
+                <p className="text-xs mt-1 opacity-70">点击"保存当前"保存常用信息</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {templates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="p-2.5 bg-white border border-amber-200 rounded-lg hover:border-amber-400 transition-all group"
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <span className="text-xs font-medium text-slate-800 truncate flex-1">
+                        {template.name}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteTemplate(template.id)}
+                        className="p-0.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all ml-1 flex-shrink-0"
+                        title="删除模板"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div className="text-xs text-slate-500 mb-2 line-clamp-1">
+                      {template.title} · {template.department}
+                    </div>
+                    <button
+                      onClick={() => handleApplyTemplate(template)}
+                      className="w-full py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Play className="w-3 h-3" />
+                      应用
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="px-6 flex-shrink-0">
         {success && (

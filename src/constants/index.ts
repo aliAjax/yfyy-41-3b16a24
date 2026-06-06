@@ -33,6 +33,7 @@ export const MEETING_ROOMS: MeetingRoom[] = [
 
 export const STORAGE_KEYS = {
   BOOKINGS: 'meeting_room_bookings',
+  TEMPLATES: 'meeting_room_templates',
 };
 
 export const BUSINESS_START_HOUR = 8;
