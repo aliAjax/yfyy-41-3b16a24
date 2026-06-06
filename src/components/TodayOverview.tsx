@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
 import { MEETING_ROOMS } from '../constants';
+import { Booking } from '../types';
 import { getTodayOverviewData, formatMeetingDuration, getTimeUntilMeeting } from '../utils/overviewUtils';
 import { formatTime, formatDate } from '../utils/dateUtils';
 import { cn } from '../lib/utils';
@@ -32,7 +33,7 @@ export function TodayOverview() {
 
   const isToday = isSameDay(currentDate, new Date());
 
-  const handleBookingClick = (booking: any) => {
+  const handleBookingClick = (booking: Booking) => {
     setSelectedBooking(booking);
     setIsModalOpen(true);
   };

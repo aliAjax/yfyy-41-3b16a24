@@ -1,5 +1,5 @@
 import { Booking, MeetingRoom, RoomStatusInfo, TodayOverviewData, RoomStatus } from '../types';
-import { isSameDay, isAfter, isBefore } from 'date-fns';
+import { isSameDay, isAfter } from 'date-fns';
 import { getBookingsForDate } from './dateUtils';
 
 export function getRoomStatus(
