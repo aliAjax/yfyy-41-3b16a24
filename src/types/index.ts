@@ -69,6 +69,30 @@ export interface BookingTemplate {
   createdAt: string;
 }
 
+export type CapacityMatchLevel = 'perfect' | 'good' | 'large' | 'far';
+
+export interface RoomRecommendation {
+  room: MeetingRoom;
+  capacityMatchLevel: CapacityMatchLevel;
+  capacityMatchText: string;
+  capacityDiff: number;
+}
+
+export interface AdjacentTimeSlot {
+  room: MeetingRoom;
+  startTime: string;
+  endTime: string;
+  direction: 'earlier' | 'later';
+  timeDiffMinutes: number;
+  capacityMatchLevel: CapacityMatchLevel;
+  capacityMatchText: string;
+}
+
+export interface RoomFinderResult {
+  recommendations: RoomRecommendation[];
+  adjacentSuggestions: AdjacentTimeSlot[];
+}
+
 export interface SavedView {
   id: string;
   name: string;

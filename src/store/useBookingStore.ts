@@ -1,5 +1,15 @@
 import { create } from 'zustand';
-import { Booking, ViewMode, BookingFormData, MeetingRoom, SavedView } from '../types';
+import {
+  Booking,
+  ViewMode,
+  BookingFormData,
+  MeetingRoom,
+  SavedView,
+  RoomRecommendation,
+  AdjacentTimeSlot,
+  RoomFinderResult,
+  CapacityMatchLevel,
+} from '../types';
 import {
   getBookingsFromStorage,
   saveBookingsToStorage,
@@ -57,7 +67,8 @@ interface BookingStore {
   batchAddBookings: (validRows: ParsedBookingRow[]) => ImportResult;
   deleteBooking: (id: string) => void;
   checkConflict: (roomId: string, startTime: string, endTime: string, excludeId?: string) => boolean;
-  findAvailableRooms: (date: string, startTime: string, endTime: string, attendees: number) => MeetingRoom[];
+  findAvailableRooms: (date: string, startTime: string, endTime: string, attendees: number) => RoomFinderResult;
+  getCapacityMatchInfo: (roomCapacity: number, attendees: number) => { level: CapacityMatchLevel; text: string; diff: number };
 
   addRoom: (room: Omit<MeetingRoom, 'id' | 'status'>) => MeetingRoom;
   updateRoom: (id: string, updates: Partial<Omit<MeetingRoom, 'id'>>) => MeetingRoom | null;
@@ -285,15 +296,112 @@ export const useBookingStore = create<BookingStore>((set, get) => {
   },
 
   findAvailableRooms: (date, startTime, endTime, attendees) => {
-    const { bookings, getActiveRooms } = get();
+    const { bookings, getActiveRooms, getCapacityMatchInfo } = get();
     const startDateTime = new Date(`${date}T${startTime}:00`);
     const endDateTime = new Date(`${date}T${endTime}:00`);
+    const durationMs = endDateTime.getTime() - startDateTime.getTime();
     const activeRooms = getActiveRooms();
 
-    return activeRooms.filter((room) => {
+    const availableRooms = activeRooms.filter((room) => {
       if (room.capacity < attendees) return false;
       return !hasConflict(bookings, room.id, startDateTime, endDateTime);
     });
+
+    const recommendations: RoomRecommendation[] = availableRooms.map((room) => {
+      const matchInfo = getCapacityMatchInfo(room.capacity, attendees);
+      return {
+        room,
+        capacityMatchLevel: matchInfo.level,
+        capacityMatchText: matchInfo.text,
+        capacityDiff: matchInfo.diff,
+      };
+    });
+
+    recommendations.sort((a, b) => {
+      const levelOrder: Record<CapacityMatchLevel, number> = {
+        perfect: 0,
+        good: 1,
+        large: 2,
+        far: 3,
+      };
+      if (levelOrder[a.capacityMatchLevel] !== levelOrder[b.capacityMatchLevel]) {
+        return levelOrder[a.capacityMatchLevel] - levelOrder[b.capacityMatchLevel];
+      }
+      return a.capacityDiff - b.capacityDiff;
+    });
+
+    const adjacentSuggestions: AdjacentTimeSlot[] = [];
+    if (recommendations.length === 0) {
+      const roomsWithEnoughCapacity = activeRooms.filter((room) => room.capacity >= attendees);
+      const stepMinutes = 30;
+      const maxSearchSteps = 24;
+
+      for (const room of roomsWithEnoughCapacity) {
+        const matchInfo = getCapacityMatchInfo(room.capacity, attendees);
+
+        for (let direction of ['earlier', 'later'] as const) {
+          for (let step = 1; step <= maxSearchSteps; step++) {
+            const offsetMs = direction === 'earlier'
+              ? -step * stepMinutes * 60 * 1000
+              : step * stepMinutes * 60 * 1000;
+            const candidateStart = new Date(startDateTime.getTime() + offsetMs);
+            const candidateEnd = new Date(endDateTime.getTime() + offsetMs);
+
+            const dayStart = new Date(`${date}T00:00:00`);
+            const dayEnd = new Date(`${date}T23:59:59`);
+            if (candidateStart < dayStart || candidateEnd > dayEnd) continue;
+
+            if (!hasConflict(bookings, room.id, candidateStart, candidateEnd)) {
+              const formatTime = (d: Date) => {
+                const h = d.getHours().toString().padStart(2, '0');
+                const m = d.getMinutes().toString().padStart(2, '0');
+                return `${h}:${m}`;
+              };
+              adjacentSuggestions.push({
+                room,
+                startTime: formatTime(candidateStart),
+                endTime: formatTime(candidateEnd),
+                direction,
+                timeDiffMinutes: step * stepMinutes,
+                capacityMatchLevel: matchInfo.level,
+                capacityMatchText: matchInfo.text,
+              });
+              break;
+            }
+          }
+        }
+      }
+
+      adjacentSuggestions.sort((a, b) => {
+        if (a.timeDiffMinutes !== b.timeDiffMinutes) {
+          return a.timeDiffMinutes - b.timeDiffMinutes;
+        }
+        const levelOrder: Record<CapacityMatchLevel, number> = {
+          perfect: 0,
+          good: 1,
+          large: 2,
+          far: 3,
+        };
+        return levelOrder[a.capacityMatchLevel] - levelOrder[b.capacityMatchLevel];
+      });
+    }
+
+    return { recommendations, adjacentSuggestions };
+  },
+
+  getCapacityMatchInfo: (roomCapacity, attendees) => {
+    const diff = roomCapacity - attendees;
+    const ratio = attendees / roomCapacity;
+
+    if (diff === 0 || ratio >= 0.95) {
+      return { level: 'perfect' as CapacityMatchLevel, text: '刚好合适', diff };
+    } else if (ratio >= 0.7) {
+      return { level: 'good' as CapacityMatchLevel, text: '容量适中', diff };
+    } else if (ratio >= 0.4) {
+      return { level: 'large' as CapacityMatchLevel, text: '容量偏大', diff };
+    } else {
+      return { level: 'far' as CapacityMatchLevel, text: '距离当前选择较远', diff };
+    }
   },
 
   addRoom: (room) => {

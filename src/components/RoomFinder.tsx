@@ -9,9 +9,12 @@ import {
   AlertCircle,
   CheckCircle,
   DoorOpen,
+  ArrowRight,
+  Sparkles,
+  Clock as ClockIcon,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
-import { MeetingRoom } from '../types';
+import { MeetingRoom, RoomRecommendation, AdjacentTimeSlot, CapacityMatchLevel } from '../types';
 import { format } from 'date-fns';
 import { BUSINESS_START_HOUR, BUSINESS_END_HOUR } from '../constants';
 
@@ -30,7 +33,8 @@ export function RoomFinder() {
     attendees: 5,
   });
 
-  const [results, setResults] = useState<MeetingRoom[]>([]);
+  const [results, setResults] = useState<RoomRecommendation[]>([]);
+  const [adjacentSuggestions, setAdjacentSuggestions] = useState<AdjacentTimeSlot[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState('');
 
@@ -68,14 +72,15 @@ export function RoomFinder() {
       return;
     }
 
-    const availableRooms = findAvailableRooms(
+    const finderResult = findAvailableRooms(
       formData.date,
       formData.startTime,
       formData.endTime,
       formData.attendees
     );
 
-    setResults(availableRooms);
+    setResults(finderResult.recommendations);
+    setAdjacentSuggestions(finderResult.adjacentSuggestions);
     setHasSearched(true);
     setError('');
   };
@@ -89,6 +94,30 @@ export function RoomFinder() {
       endTime: `${formData.date}T${formData.endTime}:00`,
       attendees: formData.attendees,
     });
+  };
+
+  const handleAdjacentSelect = (suggestion: AdjacentTimeSlot) => {
+    setSelectedRoomId(suggestion.room.id);
+    setCurrentDate(new Date(formData.date));
+    setPrefilledFormData({
+      roomId: suggestion.room.id,
+      startTime: `${formData.date}T${suggestion.startTime}:00`,
+      endTime: `${formData.date}T${suggestion.endTime}:00`,
+      attendees: formData.attendees,
+    });
+  };
+
+  const getMatchBadgeColor = (level: CapacityMatchLevel) => {
+    switch (level) {
+      case 'perfect':
+        return 'bg-green-100 text-green-700 border-green-200';
+      case 'good':
+        return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'large':
+        return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'far':
+        return 'bg-slate-100 text-slate-600 border-slate-200';
+    }
   };
 
   return (
@@ -191,10 +220,16 @@ export function RoomFinder() {
             <span className="text-sm text-slate-600">
               找到 {results.length} 个可用会议室
             </span>
+            {results.length > 0 && (
+              <span className="text-xs text-purple-500 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                智能推荐排序
+              </span>
+            )}
           </div>
         )}
 
-        {hasSearched && results.length === 0 && (
+        {hasSearched && results.length === 0 && adjacentSuggestions.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-3">
               <AlertCircle className="w-6 h-6 text-amber-500" />
@@ -206,11 +241,25 @@ export function RoomFinder() {
           </div>
         )}
 
+        {hasSearched && results.length === 0 && adjacentSuggestions.length > 0 && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <ClockIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-800">当前时段无可用会议室</p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  为你找到 {adjacentSuggestions.length} 个相邻时段的选择
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
-          {results.map((room) => (
+          {results.map((rec) => (
             <button
-              key={room.id}
-              onClick={() => handleRoomSelect(room)}
+              key={rec.room.id}
+              onClick={() => handleRoomSelect(rec.room)}
               className="w-full text-left p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-purple-50 hover:border-purple-200 transition-all group"
             >
               <div className="flex items-start justify-between">
@@ -218,20 +267,24 @@ export function RoomFinder() {
                   <div className="flex items-center gap-2 mb-1.5">
                     <div
                       className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: room.color }}
+                      style={{ backgroundColor: rec.room.color }}
                     ></div>
-                    <p className="font-semibold text-slate-800 text-sm">{room.name}</p>
+                    <p className="font-semibold text-slate-800 text-sm">{rec.room.name}</p>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <div className="flex items-center gap-3 text-xs text-slate-500 mb-2">
                     <span className="flex items-center gap-1">
                       <Users className="w-3 h-3" />
-                      {room.capacity}人
+                      {rec.room.capacity}人
                     </span>
                     <span className="flex items-center gap-1">
                       <MapPin className="w-3 h-3" />
-                      {room.location}
+                      {rec.room.location}
                     </span>
                   </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${getMatchBadgeColor(rec.capacityMatchLevel)}`}>
+                    {rec.capacityMatchLevel === 'perfect' && <CheckCircle className="w-3 h-3" />}
+                    {rec.capacityMatchText}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-600 font-medium flex items-center gap-1">
@@ -244,6 +297,54 @@ export function RoomFinder() {
             </button>
           ))}
         </div>
+
+        {hasSearched && adjacentSuggestions.length > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <ClockIcon className="w-4 h-4 text-amber-500" />
+              <span className="text-sm font-medium text-slate-700">相邻时段建议</span>
+            </div>
+            <div className="space-y-2">
+              {adjacentSuggestions.slice(0, 6).map((suggestion, index) => (
+                <button
+                  key={`${suggestion.room.id}-${suggestion.direction}-${index}`}
+                  onClick={() => handleAdjacentSelect(suggestion)}
+                  className="w-full text-left p-3 rounded-xl bg-amber-50 border border-amber-100 hover:bg-amber-100 hover:border-amber-200 transition-all group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: suggestion.room.color }}
+                        ></div>
+                        <p className="font-semibold text-slate-800 text-sm">{suggestion.room.name}</p>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                        <span className="flex items-center gap-1 text-amber-600 font-medium">
+                          <Clock className="w-3 h-3" />
+                          {suggestion.startTime} - {suggestion.endTime}
+                        </span>
+                        <span className="text-amber-500">
+                          {suggestion.direction === 'earlier' ? '提前' : '延后'}{suggestion.timeDiffMinutes}分钟
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                          {suggestion.room.capacity}人
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${getMatchBadgeColor(suggestion.capacityMatchLevel)}`}>
+                          {suggestion.capacityMatchText}
+                        </span>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-amber-400 group-hover:text-amber-600 flex-shrink-0 mt-1" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {!hasSearched && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
