@@ -5,6 +5,7 @@ import { CalendarView } from '../components/CalendarView';
 import { BookingForm } from '../components/BookingForm';
 import { BookingDetailModal } from '../components/BookingDetailModal';
 import { TodayOverview } from '../components/TodayOverview';
+import { RoomFinder } from '../components/RoomFinder';
 import { Booking } from '../types';
 
 export default function Home() {
@@ -52,10 +53,15 @@ export default function Home() {
             </div>
             
             <div
-              className="h-full"
+              className="h-full flex flex-col gap-4 min-h-0"
               style={{ animation: 'slideInRight 0.5s ease-out' }}
             >
-              <BookingForm />
+              <div className="flex-shrink-0">
+                <RoomFinder />
+              </div>
+              <div className="flex-1 min-h-0">
+                <BookingForm />
+              </div>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Booking, ViewMode, BookingFormData } from '../types';
+import { Booking, ViewMode, BookingFormData, MeetingRoom } from '../types';
 import { MEETING_ROOMS } from '../constants';
 import { getBookingsFromStorage, saveBookingsToStorage } from '../utils/storage';
 import { generateId, hasConflict } from '../utils/dateUtils';
@@ -11,16 +11,19 @@ interface BookingStore {
   currentDate: Date;
   selectedBooking: Booking | null;
   isModalOpen: boolean;
+  prefilledFormData: Partial<BookingFormData> | null;
 
   setSelectedRoomId: (id: string) => void;
   setViewMode: (mode: ViewMode) => void;
   setCurrentDate: (date: Date) => void;
   setSelectedBooking: (booking: Booking | null) => void;
   setIsModalOpen: (open: boolean) => void;
+  setPrefilledFormData: (data: Partial<BookingFormData> | null) => void;
 
   addBooking: (data: BookingFormData) => { success: boolean; message: string };
   deleteBooking: (id: string) => void;
   checkConflict: (roomId: string, startTime: string, endTime: string, excludeId?: string) => boolean;
+  findAvailableRooms: (date: string, startTime: string, endTime: string, attendees: number) => MeetingRoom[];
 }
 
 export const useBookingStore = create<BookingStore>((set, get) => ({
@@ -30,12 +33,14 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
   currentDate: new Date(),
   selectedBooking: null,
   isModalOpen: false,
+  prefilledFormData: null,
 
   setSelectedRoomId: (id) => set({ selectedRoomId: id }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setCurrentDate: (date) => set({ currentDate: date }),
   setSelectedBooking: (booking) => set({ selectedBooking: booking }),
   setIsModalOpen: (open) => set({ isModalOpen: open }),
+  setPrefilledFormData: (data) => set({ prefilledFormData: data }),
 
   addBooking: (data) => {
     const { bookings } = get();
@@ -73,5 +78,16 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
   checkConflict: (roomId, startTime, endTime, excludeId) => {
     const { bookings } = get();
     return hasConflict(bookings, roomId, new Date(startTime), new Date(endTime), excludeId);
+  },
+
+  findAvailableRooms: (date, startTime, endTime, attendees) => {
+    const { bookings } = get();
+    const startDateTime = new Date(`${date}T${startTime}:00`);
+    const endDateTime = new Date(`${date}T${endTime}:00`);
+
+    return MEETING_ROOMS.filter((room) => {
+      if (room.capacity < attendees) return false;
+      return !hasConflict(bookings, room.id, startDateTime, endDateTime);
+    });
   },
 }));

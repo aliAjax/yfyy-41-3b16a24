@@ -16,7 +16,7 @@ import { MEETING_ROOMS } from '../constants';
 import { format } from 'date-fns';
 
 export function BookingForm() {
-  const { selectedRoomId, currentDate, addBooking, checkConflict } = useBookingStore();
+  const { selectedRoomId, currentDate, addBooking, checkConflict, prefilledFormData, setPrefilledFormData } = useBookingStore();
   const [formData, setFormData] = useState({
     title: '',
     department: '',
@@ -40,6 +40,29 @@ export function BookingForm() {
       date: format(currentDate, 'yyyy-MM-dd'),
     }));
   }, [currentDate]);
+
+  useEffect(() => {
+    if (prefilledFormData) {
+      setFormData((prev) => {
+        const newData = { ...prev };
+        if (prefilledFormData.attendees !== undefined) {
+          newData.attendees = prefilledFormData.attendees;
+        }
+        if (prefilledFormData.startTime) {
+          const startDate = new Date(prefilledFormData.startTime);
+          newData.date = format(startDate, 'yyyy-MM-dd');
+          newData.startTime = format(startDate, 'HH:mm');
+        }
+        if (prefilledFormData.endTime) {
+          const endDate = new Date(prefilledFormData.endTime);
+          newData.endTime = format(endDate, 'HH:mm');
+        }
+        return newData;
+      });
+      setError('');
+      setSuccess(false);
+    }
+  }, [prefilledFormData]);
 
   useEffect(() => {
     if (formData.startTime && formData.endTime && formData.date) {
@@ -112,6 +135,7 @@ export function BookingForm() {
       if (result.success) {
         setSuccess(true);
         setError('');
+        setPrefilledFormData(null);
         setTimeout(() => setSuccess(false), 3000);
         setFormData((prev) => ({
           ...prev,
