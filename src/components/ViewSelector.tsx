@@ -55,7 +55,7 @@ export function ViewSelector() {
           </button>
         ))}
 
-        {savedViews.length > 0 && (
+        {savedViews.length > 4 && (
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -64,7 +64,7 @@ export function ViewSelector() {
               <ChevronDown className="w-3 h-3" />
             </button>
 
-            {isDropdownOpen && savedViews.length > 4 && (
+            {isDropdownOpen && (
               <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
                 {savedViews.slice(4).map((view) => (
                   <div
