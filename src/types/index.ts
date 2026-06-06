@@ -68,3 +68,13 @@ export interface BookingTemplate {
   remarks: string;
   createdAt: string;
 }
+
+export interface SavedView {
+  id: string;
+  name: string;
+  roomId: string;
+  viewMode: ViewMode;
+  currentDate: string;
+  selectedDepartment: string;
+  createdAt: string;
+}

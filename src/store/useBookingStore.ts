@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Booking, ViewMode, BookingFormData, MeetingRoom } from '../types';
+import { Booking, ViewMode, BookingFormData, MeetingRoom, SavedView } from '../types';
 import {
   getBookingsFromStorage,
   saveBookingsToStorage,
@@ -9,6 +9,9 @@ import {
   toggleRoomStatusInStorage,
   deleteRoomFromStorage,
   updateBookingInStorage,
+  getViewsFromStorage,
+  addViewToStorage,
+  deleteViewFromStorage,
 } from '../utils/storage';
 import { generateId, hasConflict } from '../utils/dateUtils';
 import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
@@ -25,6 +28,9 @@ interface BookingStore {
   selectedDepartment: string;
   isBatchImportModalOpen: boolean;
   isRoomManagementModalOpen: boolean;
+  savedViews: SavedView[];
+  isSaveViewModalOpen: boolean;
+  activeViewId: string | null;
 
   setSelectedRoomId: (id: string) => void;
   setViewMode: (mode: ViewMode) => void;
@@ -35,10 +41,16 @@ interface BookingStore {
   setSelectedDepartment: (department: string) => void;
   setIsBatchImportModalOpen: (open: boolean) => void;
   setIsRoomManagementModalOpen: (open: boolean) => void;
+  setIsSaveViewModalOpen: (open: boolean) => void;
+  setActiveViewId: (id: string | null) => void;
   getDepartments: () => string[];
   getActiveRooms: () => MeetingRoom[];
   getRoomById: (id: string) => MeetingRoom | undefined;
   hasBookingsForRoom: (roomId: string) => boolean;
+  addSavedView: (name: string) => SavedView;
+  deleteSavedView: (id: string) => void;
+  applyView: (view: SavedView) => void;
+  refreshViews: () => void;
 
   addBooking: (data: BookingFormData) => { success: boolean; message: string };
   updateBooking: (id: string, data: BookingFormData) => { success: boolean; message: string };
@@ -70,16 +82,21 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     selectedDepartment: 'all',
     isBatchImportModalOpen: false,
     isRoomManagementModalOpen: false,
+    savedViews: getViewsFromStorage(),
+    isSaveViewModalOpen: false,
+    activeViewId: null,
 
-    setSelectedRoomId: (id) => set({ selectedRoomId: id }),
-    setViewMode: (mode) => set({ viewMode: mode }),
-    setCurrentDate: (date) => set({ currentDate: date }),
+    setSelectedRoomId: (id) => set({ selectedRoomId: id, activeViewId: null }),
+    setViewMode: (mode) => set({ viewMode: mode, activeViewId: null }),
+    setCurrentDate: (date) => set({ currentDate: date, activeViewId: null }),
     setSelectedBooking: (booking) => set({ selectedBooking: booking }),
     setIsModalOpen: (open) => set({ isModalOpen: open }),
     setPrefilledFormData: (data) => set({ prefilledFormData: data }),
-    setSelectedDepartment: (department) => set({ selectedDepartment: department }),
+    setSelectedDepartment: (department) => set({ selectedDepartment: department, activeViewId: null }),
     setIsBatchImportModalOpen: (open) => set({ isBatchImportModalOpen: open }),
     setIsRoomManagementModalOpen: (open) => set({ isRoomManagementModalOpen: open }),
+    setIsSaveViewModalOpen: (open) => set({ isSaveViewModalOpen: open }),
+    setActiveViewId: (id) => set({ activeViewId: id }),
     getDepartments: () => {
       const { bookings } = get();
       const departments = [...new Set(bookings.map((b) => b.department))].filter(Boolean).sort();
@@ -96,6 +113,38 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     hasBookingsForRoom: (roomId) => {
       const { bookings } = get();
       return bookings.some((b) => b.roomId === roomId);
+    },
+    addSavedView: (name) => {
+      const { selectedRoomId, viewMode, currentDate, selectedDepartment } = get();
+      const newView = addViewToStorage({
+        name,
+        roomId: selectedRoomId,
+        viewMode,
+        currentDate: currentDate.toISOString(),
+        selectedDepartment,
+      });
+      const savedViews = getViewsFromStorage();
+      set({ savedViews, isSaveViewModalOpen: false, activeViewId: newView.id });
+      return newView;
+    },
+    deleteSavedView: (id) => {
+      deleteViewFromStorage(id);
+      const savedViews = getViewsFromStorage();
+      const { activeViewId } = get();
+      set({ savedViews, activeViewId: activeViewId === id ? null : activeViewId });
+    },
+    applyView: (view) => {
+      set({
+        selectedRoomId: view.roomId,
+        viewMode: view.viewMode,
+        currentDate: new Date(view.currentDate),
+        selectedDepartment: view.selectedDepartment,
+        activeViewId: view.id,
+      });
+    },
+    refreshViews: () => {
+      const savedViews = getViewsFromStorage();
+      set({ savedViews });
     },
 
   addBooking: (data) => {

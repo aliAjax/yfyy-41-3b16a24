@@ -9,6 +9,7 @@ import { TodayOverview } from '../components/TodayOverview';
 import { RoomFinder } from '../components/RoomFinder';
 import { BatchImportModal } from '../components/BatchImportModal';
 import { RoomManagementModal } from '../components/RoomManagementModal';
+import { SaveViewModal } from '../components/SaveViewModal';
 import { Booking } from '../types';
 
 export default function Home() {
@@ -84,6 +85,7 @@ export default function Home() {
 
       <BatchImportModal />
       <RoomManagementModal />
+      <SaveViewModal />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Booking, BookingTemplate, MeetingRoom } from '../types';
+import { Booking, BookingTemplate, MeetingRoom, SavedView } from '../types';
 import { STORAGE_KEYS, DEFAULT_MEETING_ROOMS } from '../constants';
 
 export function getBookingsFromStorage(): Booking[] {
@@ -136,4 +136,53 @@ export function deleteRoomFromStorage(id: string): boolean {
 
 export function getActiveRoomsFromStorage(): MeetingRoom[] {
   return getRoomsFromStorage().filter((r) => r.status === 'active');
+}
+
+export function getViewsFromStorage(): SavedView[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.VIEWS);
+    if (!data) return [];
+    const views: SavedView[] = JSON.parse(data);
+    return views;
+  } catch (error) {
+    console.error('Failed to load views from storage:', error);
+    return [];
+  }
+}
+
+export function saveViewsToStorage(views: SavedView[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.VIEWS, JSON.stringify(views));
+  } catch (error) {
+    console.error('Failed to save views to storage:', error);
+  }
+}
+
+export function addViewToStorage(view: Omit<SavedView, 'id' | 'createdAt'>): SavedView {
+  const views = getViewsFromStorage();
+  const newView: SavedView = {
+    ...view,
+    id: `view-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    createdAt: new Date().toISOString(),
+  };
+  views.push(newView);
+  saveViewsToStorage(views);
+  return newView;
+}
+
+export function deleteViewFromStorage(id: string): boolean {
+  const views = getViewsFromStorage();
+  const filtered = views.filter((v) => v.id !== id);
+  if (filtered.length === views.length) return false;
+  saveViewsToStorage(filtered);
+  return true;
+}
+
+export function updateViewInStorage(id: string, updates: Partial<Omit<SavedView, 'id' | 'createdAt'>>): SavedView | null {
+  const views = getViewsFromStorage();
+  const index = views.findIndex((v) => v.id === id);
+  if (index === -1) return null;
+  views[index] = { ...views[index], ...updates };
+  saveViewsToStorage(views);
+  return views[index];
 }

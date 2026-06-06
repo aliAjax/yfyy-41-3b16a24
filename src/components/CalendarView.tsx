@@ -2,6 +2,7 @@ import { useBookingStore } from '../store/useBookingStore';
 import { DayView } from './DayView';
 import { WeekView } from './WeekView';
 import { DepartmentFilter } from './DepartmentFilter';
+import { ViewSelector } from './ViewSelector';
 import { Booking } from '../types';
 
 interface CalendarViewProps {
@@ -30,6 +31,10 @@ export function CalendarView({ onBookingClick }: CalendarViewProps) {
         <div className="text-sm text-slate-500 whitespace-nowrap">
           {viewMode === 'day' ? '今日日程' : '本周日程'}
         </div>
+      </div>
+
+      <div className="px-6 py-3 border-b border-slate-100 flex-shrink-0">
+        <ViewSelector />
       </div>
 
       <div className="px-6 py-3 border-b border-slate-100 flex-shrink-0">
