@@ -169,7 +169,7 @@ export function BatchImportModal() {
         (e) => e.type === 'time_conflict' && e.message.includes(`第${targetRowIndex}行`)
       );
 
-      if (!revalidatedRow.isValid || !revalidatedRow.formData) {
+      if (!revalidatedRow.formData) {
         if (hasOldConflict) {
           const newErrors = row.errors.filter(
             (e) => !(e.type === 'time_conflict' && e.message.includes(`第${targetRowIndex}行`))
@@ -235,7 +235,7 @@ export function BatchImportModal() {
         return row;
       }
 
-      if (revalidatedRow.isValid && !hasOldConflict) {
+      if (!hasOldConflict) {
         return {
           ...row,
           errors: [
