@@ -16,7 +16,7 @@ import { cn } from '../lib/utils';
 import { isSameDay } from 'date-fns';
 
 export function TodayOverview() {
-  const { bookings, currentDate, setSelectedBooking, setIsModalOpen, setSelectedRoomId, setCurrentDate, rooms, getActiveRooms, getRoomById } = useBookingStore();
+  const { bookings, currentDate, setSelectedBooking, setIsModalOpen, setSelectedRoomId, setCurrentDate, getActiveRooms, getRoomById } = useBookingStore();
   const activeRooms = getActiveRooms();
   const [now, setNow] = useState(new Date());
 

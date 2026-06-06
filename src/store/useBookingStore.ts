@@ -97,12 +97,20 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     },
 
   addBooking: (data) => {
-    const { bookings } = get();
+    const { bookings, getRoomById } = get();
     const startDate = new Date(data.startTime);
     const endDate = new Date(data.endTime);
 
     if (startDate >= endDate) {
       return { success: false, message: '结束时间必须晚于开始时间' };
+    }
+
+    const room = getRoomById(data.roomId);
+    if (!room) {
+      return { success: false, message: '会议室不存在' };
+    }
+    if (room.status === 'inactive') {
+      return { success: false, message: '该会议室已停用，无法新建预定' };
     }
 
     if (hasConflict(bookings, data.roomId, startDate, endDate)) {

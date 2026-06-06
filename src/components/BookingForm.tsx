@@ -27,7 +27,8 @@ import {
 } from '../utils/storage';
 
 export function BookingForm() {
-  const { selectedRoomId, currentDate, addBooking, checkConflict, prefilledFormData, setPrefilledFormData, getRoomById } = useBookingStore();
+  const { selectedRoomId, currentDate, addBooking, checkConflict, prefilledFormData, setPrefilledFormData, getRoomById, getActiveRooms, setSelectedRoomId } = useBookingStore();
+  const activeRooms = getActiveRooms();
   const [formData, setFormData] = useState({
     title: '',
     department: '',
@@ -369,6 +370,24 @@ export function BookingForm() {
       )}
 
       <div className="px-6 flex-shrink-0">
+        {room?.status === 'inactive' && activeRooms.length > 0 && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-amber-800 font-medium">当前会议室已停用</p>
+                <p className="text-xs text-amber-600 mt-0.5">无法新建预定，请选择其他会议室</p>
+              </div>
+              <button
+                onClick={() => setSelectedRoomId(activeRooms[0].id)}
+                className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-lg transition-colors flex-shrink-0"
+              >
+                切换
+              </button>
+            </div>
+          </div>
+        )}
+
         {success && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700 text-sm animate-pulse">
             <CheckCircle className="w-5 h-5 flex-shrink-0" />
@@ -543,7 +562,7 @@ export function BookingForm() {
 
         <button
           type="submit"
-          disabled={isSubmitting || !!conflictWarning}
+          disabled={isSubmitting || !!conflictWarning || room?.status === 'inactive'}
           className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
         >
           {isSubmitting ? (
