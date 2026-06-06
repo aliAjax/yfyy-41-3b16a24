@@ -1,16 +1,15 @@
 import { useMemo } from 'react';
 import { BarChart3, Clock, Calendar, TrendingUp } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
-import { MEETING_ROOMS } from '../constants';
 import { getRoomWeekStats, formatDurationMinutes } from '../utils/roomStatsUtils';
 import { cn } from '../lib/utils';
 
 export function RoomRanking() {
-  const { bookings, currentDate, selectedRoomId, setSelectedRoomId } = useBookingStore();
+  const { bookings, currentDate, selectedRoomId, setSelectedRoomId, rooms } = useBookingStore();
 
   const roomStats = useMemo(() => {
-    return getRoomWeekStats(bookings, MEETING_ROOMS, currentDate);
-  }, [bookings, currentDate]);
+    return getRoomWeekStats(bookings, rooms, currentDate);
+  }, [bookings, currentDate, rooms]);
 
   const maxBookingCount = Math.max(...roomStats.map((r) => r.bookingCount), 1);
   const maxTotalDuration = Math.max(...roomStats.map((r) => r.totalDurationMinutes), 1);

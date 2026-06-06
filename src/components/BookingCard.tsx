@@ -1,6 +1,7 @@
 import { Booking } from '../types';
 import { formatTime } from '../utils/dateUtils';
-import { MEETING_ROOMS, BUSINESS_START_HOUR, HOUR_HEIGHT } from '../constants';
+import { BUSINESS_START_HOUR, HOUR_HEIGHT } from '../constants';
+import { useBookingStore } from '../store/useBookingStore';
 
 interface BookingCardProps {
   booking: Booking;
@@ -9,7 +10,8 @@ interface BookingCardProps {
 }
 
 export function BookingCard({ booking, onClick, compact = false }: BookingCardProps) {
-  const room = MEETING_ROOMS.find((r) => r.id === booking.roomId);
+  const { getRoomById } = useBookingStore();
+  const room = getRoomById(booking.roomId);
   const start = new Date(booking.startTime);
   const end = new Date(booking.endTime);
   

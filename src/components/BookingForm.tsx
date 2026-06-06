@@ -18,7 +18,6 @@ import {
   Plus,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
-import { MEETING_ROOMS } from '../constants';
 import { format } from 'date-fns';
 import { BookingTemplate } from '../types';
 import {
@@ -28,7 +27,7 @@ import {
 } from '../utils/storage';
 
 export function BookingForm() {
-  const { selectedRoomId, currentDate, addBooking, checkConflict, prefilledFormData, setPrefilledFormData } = useBookingStore();
+  const { selectedRoomId, currentDate, addBooking, checkConflict, prefilledFormData, setPrefilledFormData, getRoomById } = useBookingStore();
   const [formData, setFormData] = useState({
     title: '',
     department: '',
@@ -50,7 +49,7 @@ export function BookingForm() {
   const [newTemplateName, setNewTemplateName] = useState('');
   const [templateError, setTemplateError] = useState('');
 
-  const room = MEETING_ROOMS.find((r) => r.id === selectedRoomId);
+  const room = getRoomById(selectedRoomId);
 
   useEffect(() => {
     setFormData((prev) => ({

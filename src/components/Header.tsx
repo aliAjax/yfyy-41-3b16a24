@@ -1,11 +1,11 @@
-import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, LayoutList, Upload } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, LayoutList, Upload, Settings } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
 import { formatDate } from '../utils/dateUtils';
 import { addDays, startOfWeek, addWeeks } from 'date-fns';
 import { ExportButton } from './ExportButton';
 
 export function Header() {
-  const { viewMode, setViewMode, currentDate, setCurrentDate, setIsBatchImportModalOpen } = useBookingStore();
+  const { viewMode, setViewMode, currentDate, setCurrentDate, setIsBatchImportModalOpen, setIsRoomManagementModalOpen } = useBookingStore();
 
   const handlePrev = () => {
     if (viewMode === 'day') {
@@ -104,6 +104,13 @@ export function Header() {
             >
               <Upload className="w-4 h-4" />
               批量导入
+            </button>
+            <button
+              onClick={() => setIsRoomManagementModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
+            >
+              <Settings className="w-4 h-4" />
+              会议室管理
             </button>
             <ExportButton />
             <div className="text-right">

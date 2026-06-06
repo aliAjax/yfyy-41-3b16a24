@@ -1,5 +1,4 @@
-import { Booking, ViewMode } from '../types';
-import { MEETING_ROOMS } from '../constants';
+import { Booking, ViewMode, MeetingRoom } from '../types';
 import { formatDate, getBookingsForDate, getBookingsForWeek } from './dateUtils';
 import { startOfWeek, addDays } from 'date-fns';
 
@@ -14,16 +13,16 @@ interface ExportBookingRow {
   phone: string;
 }
 
-function getRoomName(roomId: string): string {
-  const room = MEETING_ROOMS.find((r) => r.id === roomId);
+function getRoomName(roomId: string, rooms: MeetingRoom[]): string {
+  const room = rooms.find((r) => r.id === roomId);
   return room ? room.name : roomId;
 }
 
-function bookingsToExportRows(bookings: Booking[]): ExportBookingRow[] {
+function bookingsToExportRows(bookings: Booking[], rooms: MeetingRoom[]): ExportBookingRow[] {
   return bookings
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
     .map((booking) => ({
-      roomName: getRoomName(booking.roomId),
+      roomName: getRoomName(booking.roomId, rooms),
       title: booking.title,
       department: booking.department,
       attendees: booking.attendees,
@@ -111,13 +110,14 @@ export function exportBookingsToCsv(
   bookings: Booking[],
   viewMode: ViewMode,
   date: Date,
-  roomId: string
+  roomId: string,
+  rooms: MeetingRoom[]
 ): void {
   const filteredBookings = getBookingsForExport(bookings, viewMode, date, roomId);
-  const rows = bookingsToExportRows(filteredBookings);
+  const rows = bookingsToExportRows(filteredBookings, rooms);
   const csvContent = rowsToCsv(rows);
 
-  const roomName = getRoomName(roomId);
+  const roomName = getRoomName(roomId, rooms);
   const fileName = generateFileName(viewMode, date, roomName);
 
   const BOM = '\uFEFF';

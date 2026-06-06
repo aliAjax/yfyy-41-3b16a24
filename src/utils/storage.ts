@@ -1,5 +1,5 @@
-import { Booking, BookingTemplate } from '../types';
-import { STORAGE_KEYS } from '../constants';
+import { Booking, BookingTemplate, MeetingRoom } from '../types';
+import { STORAGE_KEYS, DEFAULT_MEETING_ROOMS } from '../constants';
 
 export function getBookingsFromStorage(): Booking[] {
   try {
@@ -63,4 +63,68 @@ export function deleteTemplateFromStorage(id: string): void {
   const templates = getTemplatesFromStorage();
   const filtered = templates.filter((t) => t.id !== id);
   saveTemplatesToStorage(filtered);
+}
+
+export function getRoomsFromStorage(): MeetingRoom[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.ROOMS);
+    if (!data) {
+      saveRoomsToStorage(DEFAULT_MEETING_ROOMS);
+      return DEFAULT_MEETING_ROOMS;
+    }
+    const rooms: MeetingRoom[] = JSON.parse(data);
+    return rooms;
+  } catch (error) {
+    console.error('Failed to load rooms from storage:', error);
+    return DEFAULT_MEETING_ROOMS;
+  }
+}
+
+export function saveRoomsToStorage(rooms: MeetingRoom[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ROOMS, JSON.stringify(rooms));
+  } catch (error) {
+    console.error('Failed to save rooms to storage:', error);
+  }
+}
+
+export function addRoomToStorage(room: Omit<MeetingRoom, 'id' | 'status'>): MeetingRoom {
+  const rooms = getRoomsFromStorage();
+  const newRoom: MeetingRoom = {
+    ...room,
+    id: `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    status: 'active',
+  };
+  rooms.push(newRoom);
+  saveRoomsToStorage(rooms);
+  return newRoom;
+}
+
+export function updateRoomInStorage(id: string, updates: Partial<Omit<MeetingRoom, 'id'>>): MeetingRoom | null {
+  const rooms = getRoomsFromStorage();
+  const index = rooms.findIndex((r) => r.id === id);
+  if (index === -1) return null;
+  rooms[index] = { ...rooms[index], ...updates };
+  saveRoomsToStorage(rooms);
+  return rooms[index];
+}
+
+export function toggleRoomStatusInStorage(id: string): MeetingRoom | null {
+  const rooms = getRoomsFromStorage();
+  const room = rooms.find((r) => r.id === id);
+  if (!room) return null;
+  const newStatus = room.status === 'active' ? 'inactive' : 'active';
+  return updateRoomInStorage(id, { status: newStatus });
+}
+
+export function deleteRoomFromStorage(id: string): boolean {
+  const rooms = getRoomsFromStorage();
+  const filtered = rooms.filter((r) => r.id !== id);
+  if (filtered.length === rooms.length) return false;
+  saveRoomsToStorage(filtered);
+  return true;
+}
+
+export function getActiveRoomsFromStorage(): MeetingRoom[] {
+  return getRoomsFromStorage().filter((r) => r.status === 'active');
 }

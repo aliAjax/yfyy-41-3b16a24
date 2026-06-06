@@ -1,9 +1,12 @@
+export type MeetingRoomStatus = 'active' | 'inactive';
+
 export interface MeetingRoom {
   id: string;
   name: string;
   capacity: number;
   location: string;
   color: string;
+  status: MeetingRoomStatus;
 }
 
 export interface Booking {

@@ -1,12 +1,20 @@
 import { create } from 'zustand';
 import { Booking, ViewMode, BookingFormData, MeetingRoom } from '../types';
-import { MEETING_ROOMS } from '../constants';
-import { getBookingsFromStorage, saveBookingsToStorage } from '../utils/storage';
+import {
+  getBookingsFromStorage,
+  saveBookingsToStorage,
+  getRoomsFromStorage,
+  addRoomToStorage,
+  updateRoomInStorage,
+  toggleRoomStatusInStorage,
+  deleteRoomFromStorage,
+} from '../utils/storage';
 import { generateId, hasConflict } from '../utils/dateUtils';
 import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
 
 interface BookingStore {
   bookings: Booking[];
+  rooms: MeetingRoom[];
   selectedRoomId: string;
   viewMode: ViewMode;
   currentDate: Date;
@@ -15,6 +23,7 @@ interface BookingStore {
   prefilledFormData: Partial<BookingFormData> | null;
   selectedDepartment: string;
   isBatchImportModalOpen: boolean;
+  isRoomManagementModalOpen: boolean;
 
   setSelectedRoomId: (id: string) => void;
   setViewMode: (mode: ViewMode) => void;
@@ -24,39 +33,68 @@ interface BookingStore {
   setPrefilledFormData: (data: Partial<BookingFormData> | null) => void;
   setSelectedDepartment: (department: string) => void;
   setIsBatchImportModalOpen: (open: boolean) => void;
+  setIsRoomManagementModalOpen: (open: boolean) => void;
   getDepartments: () => string[];
+  getActiveRooms: () => MeetingRoom[];
+  getRoomById: (id: string) => MeetingRoom | undefined;
+  hasBookingsForRoom: (roomId: string) => boolean;
 
   addBooking: (data: BookingFormData) => { success: boolean; message: string };
   batchAddBookings: (validRows: ParsedBookingRow[]) => ImportResult;
   deleteBooking: (id: string) => void;
   checkConflict: (roomId: string, startTime: string, endTime: string, excludeId?: string) => boolean;
   findAvailableRooms: (date: string, startTime: string, endTime: string, attendees: number) => MeetingRoom[];
+
+  addRoom: (room: Omit<MeetingRoom, 'id' | 'status'>) => MeetingRoom;
+  updateRoom: (id: string, updates: Partial<Omit<MeetingRoom, 'id'>>) => MeetingRoom | null;
+  toggleRoomStatus: (id: string) => MeetingRoom | null;
+  deleteRoom: (id: string) => { success: boolean; message: string };
+  refreshRooms: () => void;
 }
 
-export const useBookingStore = create<BookingStore>((set, get) => ({
-  bookings: getBookingsFromStorage(),
-  selectedRoomId: MEETING_ROOMS[0].id,
-  viewMode: 'week',
-  currentDate: new Date(),
-  selectedBooking: null,
-  isModalOpen: false,
-  prefilledFormData: null,
-  selectedDepartment: 'all',
-  isBatchImportModalOpen: false,
+export const useBookingStore = create<BookingStore>((set, get) => {
+  const initialRooms = getRoomsFromStorage();
+  const firstActiveRoom = initialRooms.find((r) => r.status === 'active') || initialRooms[0];
 
-  setSelectedRoomId: (id) => set({ selectedRoomId: id }),
-  setViewMode: (mode) => set({ viewMode: mode }),
-  setCurrentDate: (date) => set({ currentDate: date }),
-  setSelectedBooking: (booking) => set({ selectedBooking: booking }),
-  setIsModalOpen: (open) => set({ isModalOpen: open }),
-  setPrefilledFormData: (data) => set({ prefilledFormData: data }),
-  setSelectedDepartment: (department) => set({ selectedDepartment: department }),
-  setIsBatchImportModalOpen: (open) => set({ isBatchImportModalOpen: open }),
-  getDepartments: () => {
-    const { bookings } = get();
-    const departments = [...new Set(bookings.map((b) => b.department))].filter(Boolean).sort();
-    return departments;
-  },
+  return {
+    bookings: getBookingsFromStorage(),
+    rooms: initialRooms,
+    selectedRoomId: firstActiveRoom?.id || '',
+    viewMode: 'week',
+    currentDate: new Date(),
+    selectedBooking: null,
+    isModalOpen: false,
+    prefilledFormData: null,
+    selectedDepartment: 'all',
+    isBatchImportModalOpen: false,
+    isRoomManagementModalOpen: false,
+
+    setSelectedRoomId: (id) => set({ selectedRoomId: id }),
+    setViewMode: (mode) => set({ viewMode: mode }),
+    setCurrentDate: (date) => set({ currentDate: date }),
+    setSelectedBooking: (booking) => set({ selectedBooking: booking }),
+    setIsModalOpen: (open) => set({ isModalOpen: open }),
+    setPrefilledFormData: (data) => set({ prefilledFormData: data }),
+    setSelectedDepartment: (department) => set({ selectedDepartment: department }),
+    setIsBatchImportModalOpen: (open) => set({ isBatchImportModalOpen: open }),
+    setIsRoomManagementModalOpen: (open) => set({ isRoomManagementModalOpen: open }),
+    getDepartments: () => {
+      const { bookings } = get();
+      const departments = [...new Set(bookings.map((b) => b.department))].filter(Boolean).sort();
+      return departments;
+    },
+    getActiveRooms: () => {
+      const { rooms } = get();
+      return rooms.filter((r) => r.status === 'active');
+    },
+    getRoomById: (id) => {
+      const { rooms } = get();
+      return rooms.find((r) => r.id === id);
+    },
+    hasBookingsForRoom: (roomId) => {
+      const { bookings } = get();
+      return bookings.some((b) => b.roomId === roomId);
+    },
 
   addBooking: (data) => {
     const { bookings } = get();
@@ -85,10 +123,11 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
   },
 
   batchAddBookings: (validRows) => {
-    const { bookings } = get();
+    const { bookings, getActiveRooms } = get();
+    const activeRooms = getActiveRooms();
 
     const rawDataRows = validRows.map((r) => r.rawData);
-    const revalidated = validateParsedRows(rawDataRows, bookings);
+    const revalidated = validateParsedRows(rawDataRows, activeRooms, bookings);
 
     const invalidCount = revalidated.filter((r) => !r.isValid).length;
     if (invalidCount > 0) {
@@ -146,13 +185,73 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
   },
 
   findAvailableRooms: (date, startTime, endTime, attendees) => {
-    const { bookings } = get();
+    const { bookings, getActiveRooms } = get();
     const startDateTime = new Date(`${date}T${startTime}:00`);
     const endDateTime = new Date(`${date}T${endTime}:00`);
+    const activeRooms = getActiveRooms();
 
-    return MEETING_ROOMS.filter((room) => {
+    return activeRooms.filter((room) => {
       if (room.capacity < attendees) return false;
       return !hasConflict(bookings, room.id, startDateTime, endDateTime);
     });
   },
-}));
+
+  addRoom: (room) => {
+    const newRoom = addRoomToStorage(room);
+    const rooms = getRoomsFromStorage();
+    set({ rooms });
+    return newRoom;
+  },
+
+  updateRoom: (id, updates) => {
+    const updatedRoom = updateRoomInStorage(id, updates);
+    if (updatedRoom) {
+      const rooms = getRoomsFromStorage();
+      set({ rooms });
+    }
+    return updatedRoom;
+  },
+
+  toggleRoomStatus: (id) => {
+    const updatedRoom = toggleRoomStatusInStorage(id);
+    if (updatedRoom) {
+      const rooms = getRoomsFromStorage();
+      const { selectedRoomId } = get();
+      set({ rooms });
+      if (selectedRoomId === id && updatedRoom.status === 'inactive') {
+        const firstActive = rooms.find((r) => r.status === 'active');
+        if (firstActive) {
+          set({ selectedRoomId: firstActive.id });
+        }
+      }
+    }
+    return updatedRoom;
+  },
+
+  deleteRoom: (id) => {
+    const { hasBookingsForRoom } = get();
+    if (hasBookingsForRoom(id)) {
+      return { success: false, message: '该会议室存在历史预定，无法删除，建议停用' };
+    }
+    const success = deleteRoomFromStorage(id);
+    if (success) {
+      const rooms = getRoomsFromStorage();
+      const { selectedRoomId } = get();
+      set({ rooms });
+      if (selectedRoomId === id) {
+        const firstActive = rooms.find((r) => r.status === 'active');
+        if (firstActive) {
+          set({ selectedRoomId: firstActive.id });
+        }
+      }
+      return { success: true, message: '删除成功' };
+    }
+    return { success: false, message: '删除失败' };
+  },
+
+  refreshRooms: () => {
+    const rooms = getRoomsFromStorage();
+    set({ rooms });
+  },
+};
+});

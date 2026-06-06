@@ -3,15 +3,14 @@ import { DayView } from './DayView';
 import { WeekView } from './WeekView';
 import { DepartmentFilter } from './DepartmentFilter';
 import { Booking } from '../types';
-import { MEETING_ROOMS } from '../constants';
 
 interface CalendarViewProps {
   onBookingClick?: (booking: Booking) => void;
 }
 
 export function CalendarView({ onBookingClick }: CalendarViewProps) {
-  const { viewMode, selectedRoomId, currentDate } = useBookingStore();
-  const room = MEETING_ROOMS.find((r) => r.id === selectedRoomId);
+  const { viewMode, selectedRoomId, currentDate, getRoomById } = useBookingStore();
+  const room = getRoomById(selectedRoomId);
 
   return (
     <div className="w-full h-full bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">

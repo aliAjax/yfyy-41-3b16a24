@@ -1,5 +1,4 @@
-import { MEETING_ROOMS } from '../constants';
-import { Booking, BookingFormData } from '../types';
+import { Booking, BookingFormData, MeetingRoom } from '../types';
 import { hasConflict, generateId } from './dateUtils';
 
 export type ValidationErrorType =
@@ -125,7 +124,8 @@ function isValidTime(timeStr: string): boolean {
 
 function validateSingleRow(
   row: Record<string, string>,
-  rowIndex: number
+  rowIndex: number,
+  rooms: MeetingRoom[]
 ): ParsedBookingRow {
   const errors: ValidationError[] = [];
 
@@ -149,7 +149,7 @@ function validateSingleRow(
   }
 
   const roomName = row['会议室名称'];
-  const room = MEETING_ROOMS.find(
+  const room = rooms.find(
     (r) => r.name === roomName || r.id === roomName
   );
   if (!room) {
@@ -157,6 +157,12 @@ function validateSingleRow(
       type: 'room_not_found',
       field: '会议室名称',
       message: `会议室不存在：${roomName}`,
+    });
+  } else if (room.status === 'inactive') {
+    errors.push({
+      type: 'room_not_found',
+      field: '会议室名称',
+      message: `会议室已停用：${roomName}`,
     });
   }
 
@@ -255,9 +261,10 @@ function validateSingleRow(
 
 export function validateParsedRows(
   rows: Record<string, string>[],
+  rooms: MeetingRoom[],
   existingBookings: Booking[] = []
 ): ParsedBookingRow[] {
-  const parsedRows = rows.map((row, idx) => validateSingleRow(row, idx + 1));
+  const parsedRows = rows.map((row, idx) => validateSingleRow(row, idx + 1, rooms));
 
   const validRows = parsedRows.filter((r) => r.isValid);
 

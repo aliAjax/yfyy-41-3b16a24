@@ -1,11 +1,11 @@
 import { Users, MapPin } from 'lucide-react';
-import { MEETING_ROOMS } from '../constants';
 import { useBookingStore } from '../store/useBookingStore';
 import { getBookingsForDate } from '../utils/dateUtils';
 import { isToday } from 'date-fns';
 
 export function RoomList() {
-  const { selectedRoomId, setSelectedRoomId, bookings, currentDate } = useBookingStore();
+  const { selectedRoomId, setSelectedRoomId, bookings, currentDate, getActiveRooms } = useBookingStore();
+  const activeRooms = getActiveRooms();
 
   const getRoomStatus = (roomId: string) => {
     if (!isToday(currentDate)) return 'unknown';
@@ -31,7 +31,7 @@ export function RoomList() {
       </h2>
       
       <div className="space-y-3 flex-1 overflow-y-auto">
-        {MEETING_ROOMS.map((room) => {
+        {activeRooms.map((room) => {
           const status = getRoomStatus(room.id);
           const isSelected = selectedRoomId === room.id;
           
@@ -83,7 +83,7 @@ export function RoomList() {
       
       <div className="mt-4 pt-4 border-t border-slate-100">
         <p className="text-xs text-slate-400 text-center">
-          共 {MEETING_ROOMS.length} 个会议室
+          共 {activeRooms.length} 个会议室
         </p>
       </div>
     </div>

@@ -9,7 +9,6 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
-import { MEETING_ROOMS } from '../constants';
 import { Booking } from '../types';
 import { getTodayOverviewData, formatMeetingDuration, getTimeUntilMeeting } from '../utils/overviewUtils';
 import { formatTime, formatDate } from '../utils/dateUtils';
@@ -17,7 +16,8 @@ import { cn } from '../lib/utils';
 import { isSameDay } from 'date-fns';
 
 export function TodayOverview() {
-  const { bookings, currentDate, setSelectedBooking, setIsModalOpen, setSelectedRoomId, setCurrentDate } = useBookingStore();
+  const { bookings, currentDate, setSelectedBooking, setIsModalOpen, setSelectedRoomId, setCurrentDate, rooms, getActiveRooms, getRoomById } = useBookingStore();
+  const activeRooms = getActiveRooms();
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -28,8 +28,8 @@ export function TodayOverview() {
   }, []);
 
   const overviewData = useMemo(() => {
-    return getTodayOverviewData(bookings, MEETING_ROOMS, currentDate, now);
-  }, [bookings, currentDate, now]);
+    return getTodayOverviewData(bookings, activeRooms, currentDate, now);
+  }, [bookings, currentDate, now, activeRooms]);
 
   const isToday = isSameDay(currentDate, new Date());
 
@@ -99,7 +99,7 @@ export function TodayOverview() {
             <Users className="w-4 h-4 text-amber-600" />
             <span className="text-xs text-amber-600 font-medium">会议室总数</span>
           </div>
-          <p className="text-2xl font-bold text-amber-700">{MEETING_ROOMS.length}</p>
+          <p className="text-2xl font-bold text-amber-700">{activeRooms.length}</p>
         </div>
       </div>
 
@@ -111,7 +111,7 @@ export function TodayOverview() {
           </h3>
           <div className="space-y-2">
             {overviewData.activeMeetings.slice(0, 2).map((booking) => {
-              const room = MEETING_ROOMS.find((r) => r.id === booking.roomId);
+              const room = getRoomById(booking.roomId);
               return (
                 <button
                   key={booking.id}
@@ -180,7 +180,7 @@ export function TodayOverview() {
         <h3 className="text-sm font-semibold text-slate-700 mb-2">会议室状态</h3>
         <div className="space-y-2">
           {overviewData.roomStatuses.map((roomStatus) => {
-            const room = MEETING_ROOMS.find((r) => r.id === roomStatus.roomId);
+            const room = getRoomById(roomStatus.roomId);
             return (
               <button
                 key={roomStatus.roomId}

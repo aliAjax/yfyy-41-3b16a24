@@ -1,6 +1,6 @@
 import { X, Calendar, Clock, Users, Building2, User, Phone, Trash2, MapPin, StickyNote } from 'lucide-react';
 import { Booking } from '../types';
-import { MEETING_ROOMS } from '../constants';
+import { useBookingStore } from '../store/useBookingStore';
 import { formatDateTime, formatTime } from '../utils/dateUtils';
 
 interface BookingDetailModalProps {
@@ -11,9 +11,11 @@ interface BookingDetailModalProps {
 }
 
 export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: BookingDetailModalProps) {
+  const { getRoomById } = useBookingStore();
+  
   if (!isOpen || !booking) return null;
 
-  const room = MEETING_ROOMS.find((r) => r.id === booking.roomId);
+  const room = getRoomById(booking.roomId);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {

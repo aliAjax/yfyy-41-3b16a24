@@ -1,16 +1,15 @@
 import { Download } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
 import { exportBookingsToCsv } from '../utils/exportUtils';
-import { MEETING_ROOMS } from '../constants';
 
 export function ExportButton() {
-  const { bookings, viewMode, currentDate, selectedRoomId } = useBookingStore();
+  const { bookings, viewMode, currentDate, selectedRoomId, getRoomById, rooms } = useBookingStore();
 
-  const room = MEETING_ROOMS.find((r) => r.id === selectedRoomId);
+  const room = getRoomById(selectedRoomId);
   const roomName = room?.name || '';
 
   const handleExport = () => {
-    exportBookingsToCsv(bookings, viewMode, currentDate, selectedRoomId);
+    exportBookingsToCsv(bookings, viewMode, currentDate, selectedRoomId, rooms);
   };
 
   return (

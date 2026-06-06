@@ -20,7 +20,7 @@ import {
   ValidationErrorType,
   generateSampleCSV,
 } from '../utils/importUtils';
-import { MEETING_ROOMS } from '../constants';
+
 
 const errorTypeConfig: Record<ValidationErrorType, { label: string; color: string; bgColor: string }> = {
   missing_field: { label: '缺字段', color: 'text-orange-700', bgColor: 'bg-orange-100' },
@@ -31,7 +31,7 @@ const errorTypeConfig: Record<ValidationErrorType, { label: string; color: strin
 };
 
 export function BatchImportModal() {
-  const { isBatchImportModalOpen, setIsBatchImportModalOpen, bookings, batchAddBookings } =
+  const { isBatchImportModalOpen, setIsBatchImportModalOpen, bookings, batchAddBookings, getActiveRooms } =
     useBookingStore();
   const [csvText, setCsvText] = useState('');
   const [parsedRows, setParsedRows] = useState<ParsedBookingRow[]>([]);
@@ -88,7 +88,8 @@ export function BatchImportModal() {
         return;
       }
 
-      const validatedRows = validateParsedRows(rows, bookings);
+      const activeRooms = getActiveRooms();
+      const validatedRows = validateParsedRows(rows, activeRooms, bookings);
       setParsedRows(validatedRows);
       setHasParsed(true);
       setImportResult(null);
@@ -474,7 +475,7 @@ export function BatchImportModal() {
               支持的会议室
             </h4>
             <div className="flex flex-wrap gap-2">
-              {MEETING_ROOMS.map((room) => (
+              {getActiveRooms().map((room) => (
                 <span
                   key={room.id}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs text-slate-600"
