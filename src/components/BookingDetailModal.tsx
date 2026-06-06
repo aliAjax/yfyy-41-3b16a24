@@ -15,6 +15,7 @@ import {
   XCircle,
   AlertCircle,
   FileText,
+  Copy,
 } from 'lucide-react';
 import { Booking } from '../types';
 import { useBookingStore } from '../store/useBookingStore';
@@ -42,7 +43,7 @@ interface EditFormData {
 }
 
 export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: BookingDetailModalProps) {
-  const { getRoomById, getActiveRooms, updateBooking, checkConflict } = useBookingStore();
+  const { getRoomById, getActiveRooms, updateBooking, checkConflict, setPrefilledFormData, setIsModalOpen, setSelectedBooking } = useBookingStore();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<EditFormData | null>(null);
   const [error, setError] = useState('');
@@ -93,6 +94,19 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
     if (window.confirm('确定要取消这个预定吗？')) {
       onDelete(booking.id);
     }
+  };
+
+  const handleCopyBooking = () => {
+    setPrefilledFormData({
+      title: booking.title,
+      department: booking.department,
+      attendees: booking.attendees,
+      contact: booking.contact,
+      phone: booking.phone,
+      remarks: booking.remarks || '',
+    });
+    setIsModalOpen(false);
+    setSelectedBooking(null);
   };
 
   const handleStartEdit = () => {
@@ -550,6 +564,13 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
                 className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-colors"
               >
                 关闭
+              </button>
+              <button
+                onClick={handleCopyBooking}
+                className="flex-1 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <Copy className="w-4 h-4" />
+                复制预订
               </button>
               <button
                 onClick={handleStartEdit}

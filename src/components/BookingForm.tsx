@@ -63,8 +63,23 @@ export function BookingForm() {
     if (prefilledFormData) {
       setFormData((prev) => {
         const newData = { ...prev };
+        if (prefilledFormData.title !== undefined) {
+          newData.title = prefilledFormData.title;
+        }
+        if (prefilledFormData.department !== undefined) {
+          newData.department = prefilledFormData.department;
+        }
         if (prefilledFormData.attendees !== undefined) {
           newData.attendees = prefilledFormData.attendees;
+        }
+        if (prefilledFormData.contact !== undefined) {
+          newData.contact = prefilledFormData.contact;
+        }
+        if (prefilledFormData.phone !== undefined) {
+          newData.phone = prefilledFormData.phone;
+        }
+        if (prefilledFormData.remarks !== undefined) {
+          newData.remarks = prefilledFormData.remarks;
         }
         if (prefilledFormData.startTime) {
           const startDate = new Date(prefilledFormData.startTime);

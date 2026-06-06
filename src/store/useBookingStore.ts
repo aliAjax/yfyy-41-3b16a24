@@ -163,6 +163,9 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     if (room.status === 'inactive') {
       return { success: false, message: '该会议室已停用，无法新建预定' };
     }
+    if (data.attendees > room.capacity) {
+      return { success: false, message: `参会人数超出会议室容量（最多${room.capacity}人）` };
+    }
 
     if (hasConflict(bookings, data.roomId, startDate, endDate)) {
       return { success: false, message: '该时间段已有会议预定，请选择其他时间' };
