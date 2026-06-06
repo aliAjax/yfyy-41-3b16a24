@@ -1,11 +1,11 @@
-import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, LayoutList } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, LayoutList, Upload } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
 import { formatDate } from '../utils/dateUtils';
 import { addDays, startOfWeek, addWeeks } from 'date-fns';
 import { ExportButton } from './ExportButton';
 
 export function Header() {
-  const { viewMode, setViewMode, currentDate, setCurrentDate } = useBookingStore();
+  const { viewMode, setViewMode, currentDate, setCurrentDate, setIsBatchImportModalOpen } = useBookingStore();
 
   const handlePrev = () => {
     if (viewMode === 'day') {
@@ -98,6 +98,13 @@ export function Header() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsBatchImportModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
+            >
+              <Upload className="w-4 h-4" />
+              批量导入
+            </button>
             <ExportButton />
             <div className="text-right">
               <p className="text-sm font-medium">{getDateDisplay()}</p>

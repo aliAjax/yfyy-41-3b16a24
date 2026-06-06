@@ -3,6 +3,7 @@ import { Booking, ViewMode, BookingFormData, MeetingRoom } from '../types';
 import { MEETING_ROOMS } from '../constants';
 import { getBookingsFromStorage, saveBookingsToStorage } from '../utils/storage';
 import { generateId, hasConflict } from '../utils/dateUtils';
+import { ImportResult, ParsedBookingRow } from '../utils/importUtils';
 
 interface BookingStore {
   bookings: Booking[];
@@ -13,6 +14,7 @@ interface BookingStore {
   isModalOpen: boolean;
   prefilledFormData: Partial<BookingFormData> | null;
   selectedDepartment: string;
+  isBatchImportModalOpen: boolean;
 
   setSelectedRoomId: (id: string) => void;
   setViewMode: (mode: ViewMode) => void;
@@ -21,9 +23,11 @@ interface BookingStore {
   setIsModalOpen: (open: boolean) => void;
   setPrefilledFormData: (data: Partial<BookingFormData> | null) => void;
   setSelectedDepartment: (department: string) => void;
+  setIsBatchImportModalOpen: (open: boolean) => void;
   getDepartments: () => string[];
 
   addBooking: (data: BookingFormData) => { success: boolean; message: string };
+  batchAddBookings: (validRows: ParsedBookingRow[]) => ImportResult;
   deleteBooking: (id: string) => void;
   checkConflict: (roomId: string, startTime: string, endTime: string, excludeId?: string) => boolean;
   findAvailableRooms: (date: string, startTime: string, endTime: string, attendees: number) => MeetingRoom[];
@@ -38,6 +42,7 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
   isModalOpen: false,
   prefilledFormData: null,
   selectedDepartment: 'all',
+  isBatchImportModalOpen: false,
 
   setSelectedRoomId: (id) => set({ selectedRoomId: id }),
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -46,6 +51,7 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
   setIsModalOpen: (open) => set({ isModalOpen: open }),
   setPrefilledFormData: (data) => set({ prefilledFormData: data }),
   setSelectedDepartment: (department) => set({ selectedDepartment: department }),
+  setIsBatchImportModalOpen: (open) => set({ isBatchImportModalOpen: open }),
   getDepartments: () => {
     const { bookings } = get();
     const departments = [...new Set(bookings.map((b) => b.department))].filter(Boolean).sort();
@@ -76,6 +82,52 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
     set({ bookings: updatedBookings });
 
     return { success: true, message: '预定成功！' };
+  },
+
+  batchAddBookings: (validRows) => {
+    const { bookings } = get();
+    const validBookings = validRows.filter((r) => r.isValid && r.formData);
+
+    if (validBookings.length === 0) {
+      return {
+        success: false,
+        totalCount: validRows.length,
+        successCount: 0,
+        failedCount: validRows.length,
+        message: '没有有效的预定数据可导入',
+      };
+    }
+
+    const hasInvalid = validRows.some((r) => !r.isValid);
+    if (hasInvalid) {
+      return {
+        success: false,
+        totalCount: validRows.length,
+        successCount: validBookings.length,
+        failedCount: validRows.length - validBookings.length,
+        message: '存在校验不通过的行，请修正后再导入',
+      };
+    }
+
+    const now = new Date().toISOString();
+    const newBookings: Booking[] = validBookings.map((row) => ({
+      id: generateId(),
+      ...row.formData!,
+      createdAt: now,
+    }));
+
+    const updatedBookings = [...bookings, ...newBookings];
+    saveBookingsToStorage(updatedBookings);
+    set({ bookings: updatedBookings });
+
+    return {
+      success: true,
+      totalCount: validRows.length,
+      successCount: newBookings.length,
+      failedCount: 0,
+      bookings: newBookings,
+      message: `成功导入 ${newBookings.length} 条预定`,
+    };
   },
 
   deleteBooking: (id) => {

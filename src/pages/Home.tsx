@@ -7,6 +7,7 @@ import { BookingForm } from '../components/BookingForm';
 import { BookingDetailModal } from '../components/BookingDetailModal';
 import { TodayOverview } from '../components/TodayOverview';
 import { RoomFinder } from '../components/RoomFinder';
+import { BatchImportModal } from '../components/BatchImportModal';
 import { Booking } from '../types';
 
 export default function Home() {
@@ -79,6 +80,8 @@ export default function Home() {
         onClose={handleCloseModal}
         onDelete={deleteBooking}
       />
+
+      <BatchImportModal />
     </div>
   );
 }
