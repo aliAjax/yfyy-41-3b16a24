@@ -155,6 +155,105 @@ export function BatchImportModal() {
     setImportResult(null);
   };
 
+  const updateRelatedRowsConflicts = (
+    targetRowIndex: number,
+    revalidatedRow: ParsedBookingRow,
+    allRows: ParsedBookingRow[]
+  ): ParsedBookingRow[] => {
+    return allRows.map((row) => {
+      if (row.rowIndex === targetRowIndex) {
+        return revalidatedRow;
+      }
+
+      const hasOldConflict = row.errors.some(
+        (e) => e.type === 'time_conflict' && e.message.includes(`第${targetRowIndex}行`)
+      );
+
+      if (!revalidatedRow.isValid || !revalidatedRow.formData) {
+        if (hasOldConflict) {
+          const newErrors = row.errors.filter(
+            (e) => !(e.type === 'time_conflict' && e.message.includes(`第${targetRowIndex}行`))
+          );
+          const newIsValid = newErrors.length === 0;
+
+          return {
+            ...row,
+            errors: newErrors,
+            isValid: newIsValid,
+          };
+        }
+        return row;
+      }
+
+      if (!row.formData) {
+        if (hasOldConflict) {
+          const newErrors = row.errors.filter(
+            (e) => !(e.type === 'time_conflict' && e.message.includes(`第${targetRowIndex}行`))
+          );
+          return {
+            ...row,
+            errors: newErrors,
+          };
+        }
+        return row;
+      }
+
+      if (row.formData.roomId !== revalidatedRow.formData.roomId) {
+        if (hasOldConflict) {
+          const newErrors = row.errors.filter(
+            (e) => !(e.type === 'time_conflict' && e.message.includes(`第${targetRowIndex}行`))
+          );
+          const newIsValid = newErrors.length === 0;
+          return {
+            ...row,
+            errors: newErrors,
+            isValid: newIsValid,
+          };
+        }
+        return row;
+      }
+
+      const rowStart = new Date(row.formData.startTime);
+      const rowEnd = new Date(row.formData.endTime);
+      const revalidStart = new Date(revalidatedRow.formData.startTime);
+      const revalidEnd = new Date(revalidatedRow.formData.endTime);
+
+      const hasTimeConflict = rowStart < revalidEnd && rowEnd > revalidStart;
+
+      if (!hasTimeConflict) {
+        if (hasOldConflict) {
+          const newErrors = row.errors.filter(
+            (e) => !(e.type === 'time_conflict' && e.message.includes(`第${targetRowIndex}行`))
+          );
+          const newIsValid = newErrors.length === 0;
+          return {
+            ...row,
+            errors: newErrors,
+            isValid: newIsValid,
+          };
+        }
+        return row;
+      }
+
+      if (revalidatedRow.isValid && !hasOldConflict) {
+        return {
+          ...row,
+          errors: [
+            ...row.errors,
+            {
+              type: 'time_conflict' as ValidationErrorType,
+              field: '时间',
+              message: `与第${targetRowIndex}行时间冲突（同一会议室）`,
+            },
+          ],
+          isValid: false,
+        };
+      }
+
+      return row;
+    });
+  };
+
   const handleCellBlur = () => {
     if (!editingCell) return;
 
@@ -175,66 +274,11 @@ export function BatchImportModal() {
     if (targetRow) {
       const activeRooms = getActiveRooms();
       const revalidated = revalidateSingleRow(targetRow, updatedRows, activeRooms, bookings);
-
-      const finalRows = updatedRows.map((row) => {
-        if (row.rowIndex === editingCell.rowIndex) {
-          return revalidated;
-        }
-
-        if (!row.isValid || !row.formData || !revalidated.formData) {
-          return row;
-        }
-
-        if (row.formData.roomId !== revalidated.formData.roomId) {
-          return row;
-        }
-
-        const rowStart = new Date(row.formData.startTime);
-        const rowEnd = new Date(row.formData.endTime);
-        const revalidStart = new Date(revalidated.formData.startTime);
-        const revalidEnd = new Date(revalidated.formData.endTime);
-
-        const hasTimeConflict = rowStart < revalidEnd && rowEnd > revalidStart;
-
-        if (!hasTimeConflict) {
-          const newErrors = row.errors.filter(
-            (e) => e.type !== 'time_conflict' || !e.message.includes(`第${editingCell.rowIndex}行`)
-          );
-          const newIsValid = newErrors.length === 0;
-
-          if (newErrors.length !== row.errors.length) {
-            return {
-              ...row,
-              errors: newErrors,
-              isValid: newIsValid,
-            };
-          }
-          return row;
-        }
-
-        if (revalidated.isValid) {
-          const alreadyHasConflict = row.errors.some(
-            (e) => e.type === 'time_conflict' && e.message.includes(`第${editingCell.rowIndex}行`)
-          );
-          if (!alreadyHasConflict) {
-            return {
-              ...row,
-              errors: [
-                ...row.errors,
-                {
-                  type: 'time_conflict' as ValidationErrorType,
-                  field: '时间',
-                  message: `与第${editingCell.rowIndex}行时间冲突（同一会议室）`,
-                },
-              ],
-              isValid: false,
-            };
-          }
-        }
-
-        return row;
-      });
-
+      const finalRows = updateRelatedRowsConflicts(
+        editingCell.rowIndex,
+        revalidated,
+        updatedRows
+      );
       setParsedRows(finalRows);
     } else {
       setParsedRows(updatedRows);
@@ -258,63 +302,7 @@ export function BatchImportModal() {
 
     const activeRooms = getActiveRooms();
     const revalidated = revalidateSingleRow(targetRow, parsedRows, activeRooms, bookings);
-
-    const newRows = parsedRows.map((row) => {
-      if (row.rowIndex === rowIndex) {
-        return revalidated;
-      }
-
-      if (!row.isValid || !row.formData || !revalidated.formData) {
-        return row;
-      }
-
-      if (row.formData.roomId !== revalidated.formData.roomId) {
-        return row;
-      }
-
-      const rowStart = new Date(row.formData.startTime);
-      const rowEnd = new Date(row.formData.endTime);
-      const revalidStart = new Date(revalidated.formData.startTime);
-      const revalidEnd = new Date(revalidated.formData.endTime);
-
-      const hasTimeConflict = rowStart < revalidEnd && rowEnd > revalidStart;
-
-      if (!hasTimeConflict) {
-        const newErrors = row.errors.filter((e) => e.type !== 'time_conflict' || !e.message.includes(`第${rowIndex}行`));
-        const newIsValid = newErrors.length === 0;
-
-        if (newErrors.length !== row.errors.length) {
-          return {
-            ...row,
-            errors: newErrors,
-            isValid: newIsValid,
-          };
-        }
-        return row;
-      }
-
-      if (revalidated.isValid) {
-        const alreadyHasConflict = row.errors.some(
-          (e) => e.type === 'time_conflict' && e.message.includes(`第${rowIndex}行`)
-        );
-        if (!alreadyHasConflict) {
-          return {
-            ...row,
-            errors: [
-              ...row.errors,
-              {
-                type: 'time_conflict' as ValidationErrorType,
-                field: '时间',
-                message: `与第${rowIndex}行时间冲突（同一会议室）`,
-              },
-            ],
-            isValid: false,
-          };
-        }
-      }
-
-      return row;
-    });
+    const newRows = updateRelatedRowsConflicts(rowIndex, revalidated, parsedRows);
 
     setParsedRows(newRows);
     setImportResult(null);

@@ -334,7 +334,7 @@ export function revalidateSingleRow(
   const otherRows = allRows.filter((r) => r.rowIndex !== targetRow.rowIndex);
 
   for (const otherRow of otherRows) {
-    if (!otherRow.isValid || !otherRow.formData) continue;
+    if (!otherRow.formData) continue;
     if (otherRow.formData.roomId !== validated.formData.roomId) continue;
 
     const startTarget = new Date(validated.formData.startTime);
