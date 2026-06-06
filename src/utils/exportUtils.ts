@@ -11,6 +11,7 @@ interface ExportBookingRow {
   endTime: string;
   contact: string;
   phone: string;
+  remarks: string;
 }
 
 function getRoomName(roomId: string, rooms: MeetingRoom[]): string {
@@ -30,6 +31,7 @@ function bookingsToExportRows(bookings: Booking[], rooms: MeetingRoom[]): Export
       endTime: formatDateTimeForExport(booking.endTime),
       contact: booking.contact,
       phone: booking.phone,
+      remarks: booking.remarks || '',
     }));
 }
 
@@ -55,6 +57,7 @@ function rowsToCsv(rows: ExportBookingRow[]): string {
     '结束时间',
     '联系人',
     '联系电话',
+    '备注',
   ];
 
   const headerRow = headers.map(escapeCsvValue).join(',');
@@ -69,6 +72,7 @@ function rowsToCsv(rows: ExportBookingRow[]): string {
       row.endTime,
       row.contact,
       row.phone,
+      row.remarks,
     ]
       .map(escapeCsvValue)
       .join(',')
@@ -77,18 +81,19 @@ function rowsToCsv(rows: ExportBookingRow[]): string {
   return [headerRow, ...dataRows].join('\n');
 }
 
-function generateFileName(viewMode: ViewMode, date: Date, roomName: string): string {
+function generateFileName(viewMode: ViewMode, date: Date, roomName: string, department: string): string {
   const safeRoomName = roomName.replace(/[\\/:*?"<>|]/g, '_');
+  const safeDeptName = department === 'all' ? '全部科室' : department.replace(/[\\/:*?"<>|]/g, '_');
 
   if (viewMode === 'day') {
     const dateStr = formatDate(date, 'yyyy-MM-dd');
-    return `会议室预定_${safeRoomName}_日视图_${dateStr}.csv`;
+    return `会议室预定_${safeRoomName}_${safeDeptName}_日视图_${dateStr}.csv`;
   } else {
     const weekStart = startOfWeek(date, { weekStartsOn: 1 });
     const weekEnd = addDays(weekStart, 6);
     const startStr = formatDate(weekStart, 'yyyyMMdd');
     const endStr = formatDate(weekEnd, 'yyyyMMdd');
-    return `会议室预定_${safeRoomName}_周视图_${startStr}-${endStr}.csv`;
+    return `会议室预定_${safeRoomName}_${safeDeptName}_周视图_${startStr}-${endStr}.csv`;
   }
 }
 
@@ -96,14 +101,22 @@ function getBookingsForExport(
   bookings: Booking[],
   viewMode: ViewMode,
   date: Date,
-  roomId: string
+  roomId: string,
+  department: string
 ): Booking[] {
+  let filteredBookings: Booking[];
   if (viewMode === 'day') {
-    return getBookingsForDate(bookings, date, roomId);
+    filteredBookings = getBookingsForDate(bookings, date, roomId);
   } else {
     const weekStart = startOfWeek(date, { weekStartsOn: 1 });
-    return getBookingsForWeek(bookings, weekStart, roomId);
+    filteredBookings = getBookingsForWeek(bookings, weekStart, roomId);
   }
+
+  if (department !== 'all') {
+    filteredBookings = filteredBookings.filter((b) => b.department === department);
+  }
+
+  return filteredBookings;
 }
 
 export function exportBookingsToCsv(
@@ -111,14 +124,20 @@ export function exportBookingsToCsv(
   viewMode: ViewMode,
   date: Date,
   roomId: string,
-  rooms: MeetingRoom[]
-): void {
-  const filteredBookings = getBookingsForExport(bookings, viewMode, date, roomId);
+  rooms: MeetingRoom[],
+  department: string
+): { success: boolean; message: string } {
+  const filteredBookings = getBookingsForExport(bookings, viewMode, date, roomId, department);
+
+  if (filteredBookings.length === 0) {
+    return { success: false, message: '当前筛选条件下没有可导出的预定数据' };
+  }
+
   const rows = bookingsToExportRows(filteredBookings, rooms);
   const csvContent = rowsToCsv(rows);
 
   const roomName = getRoomName(roomId, rooms);
-  const fileName = generateFileName(viewMode, date, roomName);
+  const fileName = generateFileName(viewMode, date, roomName, department);
 
   const BOM = '\uFEFF';
   const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -135,4 +154,6 @@ export function exportBookingsToCsv(
   document.body.removeChild(link);
 
   URL.revokeObjectURL(url);
+
+  return { success: true, message: `成功导出 ${filteredBookings.length} 条预定` };
 }
