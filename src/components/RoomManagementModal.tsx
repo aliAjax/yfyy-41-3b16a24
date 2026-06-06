@@ -11,9 +11,14 @@ import {
   AlertCircle,
   CheckCircle,
   Palette,
+  Projector,
+  Video,
+  Square,
+  Phone,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
-import { MeetingRoom } from '../types';
+import { MeetingRoom, FacilityType } from '../types';
+import { FACILITY_LIST } from '../constants';
 
 const COLOR_PRESETS = [
   '#3b82f6',
@@ -33,6 +38,7 @@ interface RoomFormData {
   capacity: number;
   location: string;
   color: string;
+  facilities: FacilityType[];
 }
 
 const emptyFormData: RoomFormData = {
@@ -40,6 +46,7 @@ const emptyFormData: RoomFormData = {
   capacity: 10,
   location: '',
   color: '#3b82f6',
+  facilities: [],
 };
 
 export function RoomManagementModal() {
@@ -97,6 +104,34 @@ export function RoomManagementModal() {
     setShowColorPicker(false);
   };
 
+  const handleFacilityToggle = (facilityType: FacilityType) => {
+    setFormData((prev) => {
+      const hasFacility = prev.facilities.includes(facilityType);
+      return {
+        ...prev,
+        facilities: hasFacility
+          ? prev.facilities.filter((f) => f !== facilityType)
+          : [...prev.facilities, facilityType],
+      };
+    });
+    setError('');
+  };
+
+  const getFacilityIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'projector':
+        return <Projector className="w-4 h-4" />;
+      case 'video':
+        return <Video className="w-4 h-4" />;
+      case 'square':
+        return <Square className="w-4 h-4" />;
+      case 'phone':
+        return <Phone className="w-4 h-4" />;
+      default:
+        return null;
+    }
+  };
+
   const handleStartAdd = () => {
     setIsEditing(true);
     setEditingRoom(null);
@@ -113,6 +148,7 @@ export function RoomManagementModal() {
       capacity: room.capacity,
       location: room.location,
       color: room.color,
+      facilities: room.facilities || [],
     });
     setError('');
     setSuccess('');
@@ -161,6 +197,7 @@ export function RoomManagementModal() {
         capacity: formData.capacity,
         location: formData.location.trim(),
         color: formData.color,
+        facilities: formData.facilities,
       });
       if (result) {
         setSuccess('会议室更新成功');
@@ -174,6 +211,7 @@ export function RoomManagementModal() {
         capacity: formData.capacity,
         location: formData.location.trim(),
         color: formData.color,
+        facilities: formData.facilities,
       });
       if (newRoom) {
         setSuccess('会议室添加成功');
@@ -343,6 +381,32 @@ export function RoomManagementModal() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  设备标签
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {FACILITY_LIST.map((facility) => {
+                    const isSelected = formData.facilities.includes(facility.type);
+                    return (
+                      <button
+                        key={facility.type}
+                        type="button"
+                        onClick={() => handleFacilityToggle(facility.type)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                          isSelected
+                            ? 'bg-blue-50 border-blue-300 text-blue-700'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {getFacilityIcon(facility.icon)}
+                        <span>{facility.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -423,6 +487,23 @@ export function RoomManagementModal() {
                                 </span>
                               )}
                             </div>
+                            {room.facilities && room.facilities.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {room.facilities.map((facilityType) => {
+                                  const facility = FACILITY_LIST.find((f) => f.type === facilityType);
+                                  if (!facility) return null;
+                                  return (
+                                    <span
+                                      key={facilityType}
+                                      className="text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 flex items-center gap-1"
+                                    >
+                                      {getFacilityIcon(facility.icon)}
+                                      {facility.label}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         </div>
 

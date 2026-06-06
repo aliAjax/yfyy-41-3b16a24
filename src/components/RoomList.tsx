@@ -1,7 +1,23 @@
-import { Users, MapPin } from 'lucide-react';
+import { Users, MapPin, Projector, Video, Square, Phone } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
 import { getBookingsForDate } from '../utils/dateUtils';
 import { isToday } from 'date-fns';
+import { FACILITY_LIST } from '../constants';
+
+const getFacilityIcon = (iconName: string) => {
+  switch (iconName) {
+    case 'projector':
+      return <Projector className="w-3 h-3" />;
+    case 'video':
+      return <Video className="w-3 h-3" />;
+    case 'square':
+      return <Square className="w-3 h-3" />;
+    case 'phone':
+      return <Phone className="w-3 h-3" />;
+    default:
+      return null;
+  }
+};
 
 export function RoomList() {
   const { selectedRoomId, setSelectedRoomId, bookings, currentDate, getActiveRooms } = useBookingStore();
@@ -76,6 +92,24 @@ export function RoomList() {
                   <span>{room.location}</span>
                 </div>
               </div>
+              
+              {room.facilities && room.facilities.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {room.facilities.map((facilityType) => {
+                    const facility = FACILITY_LIST.find((f) => f.type === facilityType);
+                    if (!facility) return null;
+                    return (
+                      <span
+                        key={facilityType}
+                        className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 flex items-center gap-0.5"
+                      >
+                        {getFacilityIcon(facility.icon)}
+                        <span className="hidden sm:inline">{facility.label}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </button>
           );
         })}

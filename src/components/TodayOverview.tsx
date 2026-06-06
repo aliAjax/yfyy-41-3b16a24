@@ -7,6 +7,10 @@ import {
   ChevronRight,
   MapPin,
   AlertCircle,
+  Projector,
+  Video,
+  Square,
+  Phone,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
 import { Booking } from '../types';
@@ -14,6 +18,22 @@ import { getTodayOverviewData, formatMeetingDuration, getTimeUntilMeeting } from
 import { formatTime, formatDate } from '../utils/dateUtils';
 import { cn } from '../lib/utils';
 import { isSameDay } from 'date-fns';
+import { FACILITY_LIST } from '../constants';
+
+const getFacilityIcon = (iconName: string) => {
+  switch (iconName) {
+    case 'projector':
+      return <Projector className="w-3 h-3" />;
+    case 'video':
+      return <Video className="w-3 h-3" />;
+    case 'square':
+      return <Square className="w-3 h-3" />;
+    case 'phone':
+      return <Phone className="w-3 h-3" />;
+    default:
+      return null;
+  }
+};
 
 export function TodayOverview() {
   const { bookings, currentDate, setSelectedBooking, setIsModalOpen, setSelectedRoomId, setCurrentDate, getActiveRooms, getRoomById } = useBookingStore();
@@ -185,30 +205,49 @@ export function TodayOverview() {
               <button
                 key={roomStatus.roomId}
                 onClick={() => handleRoomClick(roomStatus.roomId)}
-                className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition-colors group"
+                className="w-full p-2.5 rounded-xl hover:bg-slate-50 transition-colors group text-left"
               >
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: room?.color }}
-                  ></div>
-                  <span className="text-sm font-medium text-slate-700">{roomStatus.roomName}</span>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: room?.color }}
+                    ></div>
+                    <span className="text-sm font-medium text-slate-700">{roomStatus.roomName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">{roomStatus.todayBookingCount} 场会议</span>
+                    <span
+                      className={cn(
+                        'text-xs px-2 py-0.5 rounded-full font-medium',
+                        roomStatus.status === 'busy'
+                          ? 'bg-red-100 text-red-600'
+                          : roomStatus.status === 'free'
+                          ? 'bg-green-100 text-green-600'
+                          : 'bg-slate-200 text-slate-500'
+                      )}
+                    >
+                      {roomStatus.status === 'busy' ? '使用中' : roomStatus.status === 'free' ? '空闲' : '—'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">{roomStatus.todayBookingCount} 场会议</span>
-                  <span
-                    className={cn(
-                      'text-xs px-2 py-0.5 rounded-full font-medium',
-                      roomStatus.status === 'busy'
-                        ? 'bg-red-100 text-red-600'
-                        : roomStatus.status === 'free'
-                        ? 'bg-green-100 text-green-600'
-                        : 'bg-slate-200 text-slate-500'
-                    )}
-                  >
-                    {roomStatus.status === 'busy' ? '使用中' : roomStatus.status === 'free' ? '空闲' : '—'}
-                  </span>
-                </div>
+                {room?.facilities && room.facilities.length > 0 && (
+                  <div className="flex flex-wrap gap-1 ml-4">
+                    {room.facilities.map((facilityType) => {
+                      const facility = FACILITY_LIST.find((f) => f.type === facilityType);
+                      if (!facility) return null;
+                      return (
+                        <span
+                          key={facilityType}
+                          className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 flex items-center gap-0.5"
+                        >
+                          {getFacilityIcon(facility.icon)}
+                          <span className="hidden sm:inline">{facility.label}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </button>
             );
           })}

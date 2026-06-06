@@ -1,5 +1,13 @@
 export type MeetingRoomStatus = 'active' | 'inactive';
 
+export type FacilityType = 'projector' | 'video_conference' | 'whiteboard' | 'phone_conference';
+
+export interface FacilityInfo {
+  type: FacilityType;
+  label: string;
+  icon: string;
+}
+
 export interface MeetingRoom {
   id: string;
   name: string;
@@ -7,6 +15,7 @@ export interface MeetingRoom {
   location: string;
   color: string;
   status: MeetingRoomStatus;
+  facilities: FacilityType[];
 }
 
 export interface Booking {

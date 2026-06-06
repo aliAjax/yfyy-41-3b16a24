@@ -82,7 +82,10 @@ export function getRoomsFromStorage(): MeetingRoom[] {
       return DEFAULT_MEETING_ROOMS;
     }
     const rooms: MeetingRoom[] = JSON.parse(data);
-    return rooms;
+    return rooms.map((room) => ({
+      ...room,
+      facilities: room.facilities ?? [],
+    }));
   } catch (error) {
     console.error('Failed to load rooms from storage:', error);
     return DEFAULT_MEETING_ROOMS;

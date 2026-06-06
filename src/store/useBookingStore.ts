@@ -9,6 +9,7 @@ import {
   AdjacentTimeSlot,
   RoomFinderResult,
   CapacityMatchLevel,
+  FacilityType,
 } from '../types';
 import {
   getBookingsFromStorage,
@@ -74,7 +75,7 @@ interface BookingStore {
   batchAddBookings: (validRows: ParsedBookingRow[]) => ImportResult;
   deleteBooking: (id: string) => void;
   checkConflict: (roomId: string, startTime: string, endTime: string, excludeId?: string) => boolean;
-  findAvailableRooms: (date: string, startTime: string, endTime: string, attendees: number) => RoomFinderResult;
+  findAvailableRooms: (date: string, startTime: string, endTime: string, attendees: number, facilities?: FacilityType[]) => RoomFinderResult;
   getCapacityMatchInfo: (roomCapacity: number, attendees: number) => { level: CapacityMatchLevel; text: string; diff: number };
 
   addRoom: (room: Omit<MeetingRoom, 'id' | 'status'>) => MeetingRoom;
@@ -302,14 +303,21 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     return hasConflict(bookings, roomId, new Date(startTime), new Date(endTime), excludeId);
   },
 
-  findAvailableRooms: (date, startTime, endTime, attendees) => {
+  findAvailableRooms: (date, startTime, endTime, attendees, facilities = []) => {
     const { bookings, getActiveRooms, getCapacityMatchInfo } = get();
     const startDateTime = new Date(`${date}T${startTime}:00`);
     const endDateTime = new Date(`${date}T${endTime}:00`);
     const activeRooms = getActiveRooms();
 
+    const meetsFacilityRequirement = (room: MeetingRoom) => {
+      if (facilities.length === 0) return true;
+      const roomFacilities = room.facilities || [];
+      return facilities.every((f) => roomFacilities.includes(f));
+    };
+
     const availableRooms = activeRooms.filter((room) => {
       if (room.capacity < attendees) return false;
+      if (!meetsFacilityRequirement(room)) return false;
       return !hasConflict(bookings, room.id, startDateTime, endDateTime);
     });
 
@@ -338,7 +346,11 @@ export const useBookingStore = create<BookingStore>((set, get) => {
 
     const adjacentSuggestions: AdjacentTimeSlot[] = [];
     if (recommendations.length === 0) {
-      const roomsWithEnoughCapacity = activeRooms.filter((room) => room.capacity >= attendees);
+      const roomsWithEnoughCapacity = activeRooms.filter((room) => {
+        if (room.capacity < attendees) return false;
+        if (!meetsFacilityRequirement(room)) return false;
+        return true;
+      });
       const stepMinutes = ADJACENT_SEARCH_STEP_MINUTES;
       const maxSearchSteps = ADJACENT_MAX_SEARCH_STEPS;
 

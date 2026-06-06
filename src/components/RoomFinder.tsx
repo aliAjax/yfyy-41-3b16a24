@@ -12,11 +12,31 @@ import {
   ArrowRight,
   Sparkles,
   Clock as ClockIcon,
+  Projector,
+  Video,
+  Square,
+  Phone,
+  Filter,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
-import { MeetingRoom, RoomRecommendation, AdjacentTimeSlot, CapacityMatchLevel } from '../types';
+import { MeetingRoom, RoomRecommendation, AdjacentTimeSlot, CapacityMatchLevel, FacilityType } from '../types';
 import { format } from 'date-fns';
-import { BUSINESS_START_HOUR, BUSINESS_END_HOUR } from '../constants';
+import { BUSINESS_START_HOUR, BUSINESS_END_HOUR, FACILITY_LIST } from '../constants';
+
+const getFacilityIcon = (iconName: string) => {
+  switch (iconName) {
+    case 'projector':
+      return <Projector className="w-3 h-3" />;
+    case 'video':
+      return <Video className="w-3 h-3" />;
+    case 'square':
+      return <Square className="w-3 h-3" />;
+    case 'phone':
+      return <Phone className="w-3 h-3" />;
+    default:
+      return null;
+  }
+};
 
 export function RoomFinder() {
   const {
@@ -31,6 +51,7 @@ export function RoomFinder() {
     startTime: '09:00',
     endTime: '10:00',
     attendees: 5,
+    selectedFacilities: [] as FacilityType[],
   });
 
   const [results, setResults] = useState<RoomRecommendation[]>([]);
@@ -56,6 +77,19 @@ export function RoomFinder() {
     setError('');
   };
 
+  const handleFacilityToggle = (facilityType: FacilityType) => {
+    setFormData((prev) => {
+      const hasFacility = prev.selectedFacilities.includes(facilityType);
+      return {
+        ...prev,
+        selectedFacilities: hasFacility
+          ? prev.selectedFacilities.filter((f) => f !== facilityType)
+          : [...prev.selectedFacilities, facilityType],
+      };
+    });
+    setError('');
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -76,7 +110,8 @@ export function RoomFinder() {
       formData.date,
       formData.startTime,
       formData.endTime,
-      formData.attendees
+      formData.attendees,
+      formData.selectedFacilities
     );
 
     setResults(finderResult.recommendations);
@@ -205,6 +240,33 @@ export function RoomFinder() {
           />
         </div>
 
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
+            <Filter className="w-4 h-4 text-slate-400" />
+            设备筛选
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {FACILITY_LIST.map((facility) => {
+              const isSelected = formData.selectedFacilities.includes(facility.type);
+              return (
+                <button
+                  key={facility.type}
+                  type="button"
+                  onClick={() => handleFacilityToggle(facility.type)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    isSelected
+                      ? 'bg-purple-50 border-purple-300 text-purple-700'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {getFacilityIcon(facility.icon)}
+                  <span>{facility.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <button
           type="submit"
           className="w-full py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
@@ -281,6 +343,23 @@ export function RoomFinder() {
                       {rec.room.location}
                     </span>
                   </div>
+                  {rec.room.facilities && rec.room.facilities.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {rec.room.facilities.map((facilityType) => {
+                        const facility = FACILITY_LIST.find((f) => f.type === facilityType);
+                        if (!facility) return null;
+                        return (
+                          <span
+                            key={facilityType}
+                            className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 flex items-center gap-0.5"
+                          >
+                            {getFacilityIcon(facility.icon)}
+                            {facility.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                   <span className={`text-xs px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${getMatchBadgeColor(rec.capacityMatchLevel)}`}>
                     {rec.capacityMatchLevel === 'perfect' && <CheckCircle className="w-3 h-3" />}
                     {rec.capacityMatchText}
@@ -329,7 +408,7 @@ export function RoomFinder() {
                           {suggestion.direction === 'earlier' ? '提前' : '延后'}{suggestion.timeDiffMinutes}分钟
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                           {suggestion.room.capacity}人
                         </span>
@@ -337,6 +416,23 @@ export function RoomFinder() {
                           {suggestion.capacityMatchText}
                         </span>
                       </div>
+                      {suggestion.room.facilities && suggestion.room.facilities.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {suggestion.room.facilities.map((facilityType) => {
+                            const facility = FACILITY_LIST.find((f) => f.type === facilityType);
+                            if (!facility) return null;
+                            return (
+                              <span
+                                key={facilityType}
+                                className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 flex items-center gap-0.5"
+                              >
+                                {getFacilityIcon(facility.icon)}
+                                {facility.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                     <ArrowRight className="w-4 h-4 text-amber-400 group-hover:text-amber-600 flex-shrink-0 mt-1" />
                   </div>
