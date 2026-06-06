@@ -12,6 +12,7 @@ interface BookingStore {
   selectedBooking: Booking | null;
   isModalOpen: boolean;
   prefilledFormData: Partial<BookingFormData> | null;
+  selectedDepartment: string;
 
   setSelectedRoomId: (id: string) => void;
   setViewMode: (mode: ViewMode) => void;
@@ -19,6 +20,8 @@ interface BookingStore {
   setSelectedBooking: (booking: Booking | null) => void;
   setIsModalOpen: (open: boolean) => void;
   setPrefilledFormData: (data: Partial<BookingFormData> | null) => void;
+  setSelectedDepartment: (department: string) => void;
+  getDepartments: () => string[];
 
   addBooking: (data: BookingFormData) => { success: boolean; message: string };
   deleteBooking: (id: string) => void;
@@ -34,6 +37,7 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
   selectedBooking: null,
   isModalOpen: false,
   prefilledFormData: null,
+  selectedDepartment: 'all',
 
   setSelectedRoomId: (id) => set({ selectedRoomId: id }),
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -41,6 +45,12 @@ export const useBookingStore = create<BookingStore>((set, get) => ({
   setSelectedBooking: (booking) => set({ selectedBooking: booking }),
   setIsModalOpen: (open) => set({ isModalOpen: open }),
   setPrefilledFormData: (data) => set({ prefilledFormData: data }),
+  setSelectedDepartment: (department) => set({ selectedDepartment: department }),
+  getDepartments: () => {
+    const { bookings } = get();
+    const departments = [...new Set(bookings.map((b) => b.department))].filter(Boolean).sort();
+    return departments;
+  },
 
   addBooking: (data) => {
     const { bookings } = get();

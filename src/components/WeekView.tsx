@@ -9,7 +9,7 @@ interface WeekViewProps {
 }
 
 export function WeekView({ onBookingClick }: WeekViewProps) {
-  const { currentDate, bookings, selectedRoomId } = useBookingStore();
+  const { currentDate, bookings, selectedRoomId, selectedDepartment } = useBookingStore();
   const weekDays = getWeekDays(currentDate);
   
   const hours = [];
@@ -57,7 +57,10 @@ export function WeekView({ onBookingClick }: WeekViewProps) {
         
         <div className="flex-1 flex min-w-0">
           {weekDays.map((day, dayIndex) => {
-            const dayBookings = getBookingsForDate(bookings, day, selectedRoomId);
+            const dayBookings = getBookingsForDate(bookings, day, selectedRoomId).filter((booking) => {
+              if (selectedDepartment === 'all') return true;
+              return booking.department === selectedDepartment;
+            });
             
             return (
               <div

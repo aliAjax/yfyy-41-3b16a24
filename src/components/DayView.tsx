@@ -12,10 +12,13 @@ interface DayViewProps {
 }
 
 export function DayView({ date, roomId, onBookingClick, showHeader = false }: DayViewProps) {
-  const { bookings, selectedRoomId } = useBookingStore();
+  const { bookings, selectedRoomId, selectedDepartment } = useBookingStore();
   const actualRoomId = roomId || selectedRoomId;
   
-  const dayBookings = getBookingsForDate(bookings, date, actualRoomId);
+  const dayBookings = getBookingsForDate(bookings, date, actualRoomId).filter((booking) => {
+    if (selectedDepartment === 'all') return true;
+    return booking.department === selectedDepartment;
+  });
   
   const hours = [];
   for (let h = BUSINESS_START_HOUR; h < BUSINESS_END_HOUR; h++) {
