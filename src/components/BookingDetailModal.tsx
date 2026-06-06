@@ -63,6 +63,21 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!formData || !isEditing || !booking) return;
+
+    const startDateTime = `${formData.date}T${formData.startTime}:00`;
+    const endDateTime = `${formData.date}T${formData.endTime}:00`;
+
+    if (new Date(startDateTime) >= new Date(endDateTime)) {
+      setConflictWarning('结束时间必须晚于开始时间');
+    } else if (checkConflict(formData.roomId, startDateTime, endDateTime, booking.id)) {
+      setConflictWarning('该时间段已有会议预定');
+    } else {
+      setConflictWarning('');
+    }
+  }, [formData?.startTime, formData?.endTime, formData?.date, formData?.roomId, isEditing, booking, checkConflict]);
+
   if (!isOpen || !booking) return null;
 
   const room = getRoomById(booking.roomId);
@@ -118,21 +133,6 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
     setError('');
     setSuccessMessage('');
   };
-
-  useEffect(() => {
-    if (!formData || !isEditing) return;
-
-    const startDateTime = `${formData.date}T${formData.startTime}:00`;
-    const endDateTime = `${formData.date}T${formData.endTime}:00`;
-
-    if (new Date(startDateTime) >= new Date(endDateTime)) {
-      setConflictWarning('结束时间必须晚于开始时间');
-    } else if (checkConflict(formData.roomId, startDateTime, endDateTime, booking.id)) {
-      setConflictWarning('该时间段已有会议预定');
-    } else {
-      setConflictWarning('');
-    }
-  }, [formData?.startTime, formData?.endTime, formData?.date, formData?.roomId, isEditing, booking.id, checkConflict]);
 
   const handleSave = () => {
     if (!formData) return;
