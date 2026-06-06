@@ -24,6 +24,15 @@ export function saveBookingsToStorage(bookings: Booking[]): void {
   }
 }
 
+export function updateBookingInStorage(id: string, updates: Partial<Omit<Booking, 'id' | 'createdAt'>>): Booking | null {
+  const bookings = getBookingsFromStorage();
+  const index = bookings.findIndex((b) => b.id === id);
+  if (index === -1) return null;
+  bookings[index] = { ...bookings[index], ...updates };
+  saveBookingsToStorage(bookings);
+  return bookings[index];
+}
+
 export function getTemplatesFromStorage(): BookingTemplate[] {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.TEMPLATES);

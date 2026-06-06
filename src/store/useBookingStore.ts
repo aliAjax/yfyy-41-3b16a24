@@ -8,6 +8,7 @@ import {
   updateRoomInStorage,
   toggleRoomStatusInStorage,
   deleteRoomFromStorage,
+  updateBookingInStorage,
 } from '../utils/storage';
 import { generateId, hasConflict } from '../utils/dateUtils';
 import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
@@ -40,6 +41,7 @@ interface BookingStore {
   hasBookingsForRoom: (roomId: string) => boolean;
 
   addBooking: (data: BookingFormData) => { success: boolean; message: string };
+  updateBooking: (id: string, data: BookingFormData) => { success: boolean; message: string };
   batchAddBookings: (validRows: ParsedBookingRow[]) => ImportResult;
   deleteBooking: (id: string) => void;
   checkConflict: (roomId: string, startTime: string, endTime: string, excludeId?: string) => boolean;
@@ -128,6 +130,44 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     set({ bookings: updatedBookings });
 
     return { success: true, message: '预定成功！' };
+  },
+
+  updateBooking: (id, data) => {
+    const { bookings, getRoomById } = get();
+    const startDate = new Date(data.startTime);
+    const endDate = new Date(data.endTime);
+
+    if (startDate >= endDate) {
+      return { success: false, message: '结束时间必须晚于开始时间' };
+    }
+
+    const room = getRoomById(data.roomId);
+    if (!room) {
+      return { success: false, message: '会议室不存在' };
+    }
+    if (room.status === 'inactive') {
+      return { success: false, message: '该会议室已停用，无法修改预定' };
+    }
+
+    if (data.attendees > room.capacity) {
+      return { success: false, message: `参会人数超出会议室容量（最多${room.capacity}人）` };
+    }
+
+    if (hasConflict(bookings, data.roomId, startDate, endDate, id)) {
+      return { success: false, message: '该时间段已有会议预定，请选择其他时间' };
+    }
+
+    const updatedBooking = updateBookingInStorage(id, {
+      ...data,
+    });
+
+    if (updatedBooking) {
+      const updatedBookings = getBookingsFromStorage();
+      set({ bookings: updatedBookings, selectedBooking: updatedBooking });
+      return { success: true, message: '修改成功！' };
+    }
+
+    return { success: false, message: '修改失败，预定不存在' };
   },
 
   batchAddBookings: (validRows) => {
