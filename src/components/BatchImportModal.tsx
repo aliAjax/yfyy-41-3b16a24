@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   XCircle,
   Info,
+  RefreshCw,
+  Edit3,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
 import {
@@ -19,7 +21,14 @@ import {
   ParsedBookingRow,
   ValidationErrorType,
   generateSampleCSV,
+  revalidateSingleRow,
+  revalidateAllRows,
 } from '../utils/importUtils';
+
+interface EditingCell {
+  rowIndex: number;
+  field: string;
+}
 
 
 const errorTypeConfig: Record<ValidationErrorType, { label: string; color: string; bgColor: string }> = {
@@ -41,6 +50,8 @@ export function BatchImportModal() {
     message: string;
   } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   const stats = useMemo(() => {
     const total = parsedRows.length;
@@ -136,6 +147,184 @@ export function BatchImportModal() {
     link.download = '预定导入示例.csv';
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleCellClick = (rowIndex: number, field: string, currentValue: string) => {
+    setEditingCell({ rowIndex, field });
+    setEditValue(currentValue);
+    setImportResult(null);
+  };
+
+  const handleCellBlur = () => {
+    if (!editingCell) return;
+
+    const updatedRows = parsedRows.map((row) => {
+      if (row.rowIndex === editingCell.rowIndex) {
+        return {
+          ...row,
+          rawData: {
+            ...row.rawData,
+            [editingCell.field]: editValue.trim(),
+          },
+        };
+      }
+      return row;
+    });
+
+    const targetRow = updatedRows.find((r) => r.rowIndex === editingCell.rowIndex);
+    if (targetRow) {
+      const activeRooms = getActiveRooms();
+      const revalidated = revalidateSingleRow(targetRow, updatedRows, activeRooms, bookings);
+
+      const finalRows = updatedRows.map((row) => {
+        if (row.rowIndex === editingCell.rowIndex) {
+          return revalidated;
+        }
+
+        if (!row.isValid || !row.formData || !revalidated.formData) {
+          return row;
+        }
+
+        if (row.formData.roomId !== revalidated.formData.roomId) {
+          return row;
+        }
+
+        const rowStart = new Date(row.formData.startTime);
+        const rowEnd = new Date(row.formData.endTime);
+        const revalidStart = new Date(revalidated.formData.startTime);
+        const revalidEnd = new Date(revalidated.formData.endTime);
+
+        const hasTimeConflict = rowStart < revalidEnd && rowEnd > revalidStart;
+
+        if (!hasTimeConflict) {
+          const newErrors = row.errors.filter(
+            (e) => e.type !== 'time_conflict' || !e.message.includes(`第${editingCell.rowIndex}行`)
+          );
+          const newIsValid = newErrors.length === 0;
+
+          if (newErrors.length !== row.errors.length) {
+            return {
+              ...row,
+              errors: newErrors,
+              isValid: newIsValid,
+            };
+          }
+          return row;
+        }
+
+        if (revalidated.isValid) {
+          const alreadyHasConflict = row.errors.some(
+            (e) => e.type === 'time_conflict' && e.message.includes(`第${editingCell.rowIndex}行`)
+          );
+          if (!alreadyHasConflict) {
+            return {
+              ...row,
+              errors: [
+                ...row.errors,
+                {
+                  type: 'time_conflict' as ValidationErrorType,
+                  field: '时间',
+                  message: `与第${editingCell.rowIndex}行时间冲突（同一会议室）`,
+                },
+              ],
+              isValid: false,
+            };
+          }
+        }
+
+        return row;
+      });
+
+      setParsedRows(finalRows);
+    } else {
+      setParsedRows(updatedRows);
+    }
+
+    setEditingCell(null);
+    setImportResult(null);
+  };
+
+  const handleCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleCellBlur();
+    } else if (e.key === 'Escape') {
+      setEditingCell(null);
+    }
+  };
+
+  const handleRevalidateRow = (rowIndex: number) => {
+    const targetRow = parsedRows.find((r) => r.rowIndex === rowIndex);
+    if (!targetRow) return;
+
+    const activeRooms = getActiveRooms();
+    const revalidated = revalidateSingleRow(targetRow, parsedRows, activeRooms, bookings);
+
+    const newRows = parsedRows.map((row) => {
+      if (row.rowIndex === rowIndex) {
+        return revalidated;
+      }
+
+      if (!row.isValid || !row.formData || !revalidated.formData) {
+        return row;
+      }
+
+      if (row.formData.roomId !== revalidated.formData.roomId) {
+        return row;
+      }
+
+      const rowStart = new Date(row.formData.startTime);
+      const rowEnd = new Date(row.formData.endTime);
+      const revalidStart = new Date(revalidated.formData.startTime);
+      const revalidEnd = new Date(revalidated.formData.endTime);
+
+      const hasTimeConflict = rowStart < revalidEnd && rowEnd > revalidStart;
+
+      if (!hasTimeConflict) {
+        const newErrors = row.errors.filter((e) => e.type !== 'time_conflict' || !e.message.includes(`第${rowIndex}行`));
+        const newIsValid = newErrors.length === 0;
+
+        if (newErrors.length !== row.errors.length) {
+          return {
+            ...row,
+            errors: newErrors,
+            isValid: newIsValid,
+          };
+        }
+        return row;
+      }
+
+      if (revalidated.isValid) {
+        const alreadyHasConflict = row.errors.some(
+          (e) => e.type === 'time_conflict' && e.message.includes(`第${rowIndex}行`)
+        );
+        if (!alreadyHasConflict) {
+          return {
+            ...row,
+            errors: [
+              ...row.errors,
+              {
+                type: 'time_conflict' as ValidationErrorType,
+                field: '时间',
+                message: `与第${rowIndex}行时间冲突（同一会议室）`,
+              },
+            ],
+            isValid: false,
+          };
+        }
+      }
+
+      return row;
+    });
+
+    setParsedRows(newRows);
+    setImportResult(null);
+  };
+
+  const handleRevalidateAll = () => {
+    const activeRooms = getActiveRooms();
+    const revalidatedRows = revalidateAllRows(parsedRows, activeRooms, bookings);
+    setParsedRows(revalidatedRows);
+    setImportResult(null);
   };
 
   if (!isBatchImportModalOpen) return null;
@@ -245,18 +434,27 @@ export function BatchImportModal() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700">校验结果预览</h3>
-                <div className="flex items-center gap-4 text-xs">
-                  <span className="flex items-center gap-1 text-slate-600">
-                    共 <span className="font-semibold text-slate-800">{stats.total}</span> 行
-                  </span>
-                  <span className="flex items-center gap-1 text-green-600">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    通过 <span className="font-semibold">{stats.valid}</span> 行
-                  </span>
-                  <span className="flex items-center gap-1 text-red-600">
-                    <XCircle className="w-3.5 h-3.5" />
-                    失败 <span className="font-semibold">{stats.invalid}</span> 行
-                  </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleRevalidateAll}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    重新校验全部
+                  </button>
+                  <div className="flex items-center gap-4 text-xs">
+                    <span className="flex items-center gap-1 text-slate-600">
+                      共 <span className="font-semibold text-slate-800">{stats.total}</span> 行
+                    </span>
+                    <span className="flex items-center gap-1 text-green-600">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      通过 <span className="font-semibold">{stats.valid}</span> 行
+                    </span>
+                    <span className="flex items-center gap-1 text-red-600">
+                      <XCircle className="w-3.5 h-3.5" />
+                      失败 <span className="font-semibold">{stats.invalid}</span> 行
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -301,8 +499,11 @@ export function BatchImportModal() {
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600">
                           日期
                         </th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 w-20">
-                          时间
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 w-32">
+                          开始时间
+                        </th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 w-32">
+                          结束时间
                         </th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600">
                           联系人
@@ -310,126 +511,186 @@ export function BatchImportModal() {
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 w-28">
                           状态
                         </th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 w-24">
+                          操作
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {parsedRows.map((row) => (
-                        <tr
-                          key={row.rowIndex}
-                          className={`${
-                            row.isValid
-                              ? 'hover:bg-green-50/50'
-                              : 'bg-red-50/30 hover:bg-red-50/60'
-                          } transition-colors`}
-                        >
-                          <td className="px-3 py-2.5 text-slate-500 font-mono text-xs">
-                            {row.rowIndex}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span
-                              className={
-                                row.errors.some((e) => e.type === 'room_not_found')
-                                  ? 'text-red-600'
-                                  : 'text-slate-700'
-                              }
+                      {parsedRows.map((row) => {
+                        const isEditingThisRow = editingCell?.rowIndex === row.rowIndex;
+
+                        const renderEditableCell = (
+                          field: string,
+                          hasError: boolean,
+                          textColorClass: string
+                        ) => {
+                          const value = row.rawData[field] || '';
+                          const isEditing = isEditingThisRow && editingCell?.field === field;
+
+                          if (isEditing) {
+                            return (
+                              <input
+                                autoFocus
+                                type="text"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onBlur={handleCellBlur}
+                                onKeyDown={handleCellKeyDown}
+                                className="w-full px-2 py-1 text-sm border-2 border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              />
+                            );
+                          }
+
+                          return (
+                            <div
+                              className={`flex items-center gap-1 cursor-pointer group min-h-[24px] ${
+                                hasError ? 'text-red-600' : textColorClass
+                              }`}
+                              onClick={() => handleCellClick(row.rowIndex, field, value)}
                             >
-                              {row.rawData['会议室名称'] || '-'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span
-                              className={
+                              <span className="flex-1">
+                                {value || '-'}
+                              </span>
+                              <Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
+                            </div>
+                          );
+                        };
+
+                        return (
+                          <tr
+                            key={row.rowIndex}
+                            className={`${
+                              row.isValid
+                                ? 'hover:bg-green-50/50'
+                                : 'bg-red-50/30 hover:bg-red-50/60'
+                            } transition-colors`}
+                          >
+                            <td className="px-3 py-2.5 text-slate-500 font-mono text-xs">
+                              {row.rowIndex}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {renderEditableCell(
+                                '会议室名称',
+                                row.errors.some((e) => e.type === 'room_not_found'),
+                                'text-slate-700'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {renderEditableCell(
+                                '会议主题',
                                 row.errors.some(
                                   (e) =>
                                     e.type === 'missing_field' && e.field === '会议主题'
-                                )
-                                  ? 'text-red-600'
-                                  : 'text-slate-700'
-                              }
-                            >
-                              {row.rawData['会议主题'] || '-'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-slate-600">
-                            {row.rawData['使用科室'] || '-'}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span
-                              className={
+                                ),
+                                'text-slate-700'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {renderEditableCell(
+                                '使用科室',
+                                row.errors.some(
+                                  (e) =>
+                                    e.type === 'missing_field' && e.field === '使用科室'
+                                ),
+                                'text-slate-600'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {renderEditableCell(
+                                '参会人数',
                                 row.errors.some(
                                   (e) =>
                                     e.type === 'capacity_exceeded' ||
-                                    (e.type === 'missing_field' && e.field === '参会人数')
-                                )
-                                  ? 'text-red-600 font-medium'
-                                  : 'text-slate-700'
-                              }
-                            >
-                              {row.rawData['参会人数'] || '-'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span
-                              className={
+                                    (e.type === 'missing_field' && e.field === '参会人数') ||
+                                    (e.type === 'invalid_format' && e.field === '参会人数')
+                                ),
+                                'text-slate-700'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {renderEditableCell(
+                                '日期',
                                 row.errors.some(
                                   (e) =>
                                     e.type === 'invalid_format' && e.field === '日期'
-                                )
-                                  ? 'text-red-600'
-                                  : 'text-slate-600'
-                              }
-                            >
-                              {row.rawData['日期'] || '-'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span
-                              className={
+                                ),
+                                'text-slate-600'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {renderEditableCell(
+                                '开始时间',
                                 row.errors.some(
                                   (e) =>
-                                    e.type === 'invalid_format' || e.type === 'time_conflict'
-                                )
-                                  ? 'text-red-600'
-                                  : 'text-slate-600'
-                              }
-                            >
-                              {row.rawData['开始时间'] || '-'} -{' '}
-                              {row.rawData['结束时间'] || '-'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-slate-600">
-                            {row.rawData['联系人'] || '-'}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            {row.isValid ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-                                <CheckCircle2 className="w-3 h-3" />
-                                通过
-                              </span>
-                            ) : (
-                              <div className="space-y-1">
-                                {row.errors.slice(0, 2).map((err, idx) => {
-                                  const config = errorTypeConfig[err.type];
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className={`text-xs px-1.5 py-0.5 rounded ${config.bgColor} ${config.color}`}
-                                      title={err.message}
-                                    >
-                                      {config.label}
-                                    </div>
-                                  );
-                                })}
-                                {row.errors.length > 2 && (
-                                  <span className="text-xs text-slate-500">
-                                    +{row.errors.length - 2} 更多
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                                    (e.type === 'invalid_format' && e.field === '开始时间') ||
+                                    e.type === 'time_conflict'
+                                ),
+                                'text-slate-600'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {renderEditableCell(
+                                '结束时间',
+                                row.errors.some(
+                                  (e) =>
+                                    (e.type === 'invalid_format' && e.field === '结束时间') ||
+                                    e.type === 'time_conflict'
+                                ),
+                                'text-slate-600'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {renderEditableCell(
+                                '联系人',
+                                row.errors.some(
+                                  (e) =>
+                                    e.type === 'missing_field' && e.field === '联系人'
+                                ),
+                                'text-slate-600'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {row.isValid ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  通过
+                                </span>
+                              ) : (
+                                <div className="space-y-1">
+                                  {row.errors.slice(0, 2).map((err, idx) => {
+                                    const config = errorTypeConfig[err.type];
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className={`text-xs px-1.5 py-0.5 rounded ${config.bgColor} ${config.color}`}
+                                        title={err.message}
+                                      >
+                                        {config.label}
+                                      </div>
+                                    );
+                                  })}
+                                  {row.errors.length > 2 && (
+                                    <span className="text-xs text-slate-500">
+                                      +{row.errors.length - 2} 更多
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <button
+                                onClick={() => handleRevalidateRow(row.rowIndex)}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                title="重新校验本行"
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                                校验
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

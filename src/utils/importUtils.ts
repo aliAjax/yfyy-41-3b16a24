@@ -122,7 +122,7 @@ function isValidTime(timeStr: string): boolean {
   return /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr);
 }
 
-function validateSingleRow(
+export function validateSingleRow(
   row: Record<string, string>,
   rowIndex: number,
   rooms: MeetingRoom[]
@@ -317,6 +317,66 @@ export function validateParsedRows(
   }
 
   return parsedRows;
+}
+
+export function revalidateSingleRow(
+  targetRow: ParsedBookingRow,
+  allRows: ParsedBookingRow[],
+  rooms: MeetingRoom[],
+  existingBookings: Booking[] = []
+): ParsedBookingRow {
+  const validated = validateSingleRow(targetRow.rawData, targetRow.rowIndex, rooms);
+
+  if (!validated.isValid || !validated.formData) {
+    return validated;
+  }
+
+  const otherRows = allRows.filter((r) => r.rowIndex !== targetRow.rowIndex);
+
+  for (const otherRow of otherRows) {
+    if (!otherRow.isValid || !otherRow.formData) continue;
+    if (otherRow.formData.roomId !== validated.formData.roomId) continue;
+
+    const startTarget = new Date(validated.formData.startTime);
+    const endTarget = new Date(validated.formData.endTime);
+    const startOther = new Date(otherRow.formData.startTime);
+    const endOther = new Date(otherRow.formData.endTime);
+
+    if (startTarget < endOther && endTarget > startOther) {
+      validated.errors.push({
+        type: 'time_conflict',
+        field: '时间',
+        message: `与第${otherRow.rowIndex}行时间冲突（同一会议室）`,
+      });
+      validated.isValid = false;
+      break;
+    }
+  }
+
+  if (validated.isValid && validated.formData) {
+    const startDate = new Date(validated.formData.startTime);
+    const endDate = new Date(validated.formData.endTime);
+
+    if (hasConflict(existingBookings, validated.formData.roomId, startDate, endDate)) {
+      validated.errors.push({
+        type: 'time_conflict',
+        field: '时间',
+        message: '与已有预定时间冲突',
+      });
+      validated.isValid = false;
+    }
+  }
+
+  return validated;
+}
+
+export function revalidateAllRows(
+  allRows: ParsedBookingRow[],
+  rooms: MeetingRoom[],
+  existingBookings: Booking[] = []
+): ParsedBookingRow[] {
+  const rawRows = allRows.map((r) => r.rawData);
+  return validateParsedRows(rawRows, rooms, existingBookings);
 }
 
 export function createBookingsFromValidRows(
