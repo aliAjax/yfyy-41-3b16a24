@@ -16,18 +16,20 @@ import {
   Trash2,
   Play,
   Plus,
+  Repeat,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
-import { format } from 'date-fns';
-import { BookingTemplate } from '../types';
+import { format, addDays, addWeeks, addMonths } from 'date-fns';
+import { BookingTemplate, RecurrenceType, BookingConflictInfo } from '../types';
 import {
   getTemplatesFromStorage,
   addTemplateToStorage,
   deleteTemplateFromStorage,
 } from '../utils/storage';
+import { RecurrenceConflictModal } from './RecurrenceConflictModal';
 
 export function BookingForm() {
-  const { selectedRoomId, currentDate, addBooking, checkConflict, prefilledFormData, setPrefilledFormData, getRoomById, getActiveRooms, setSelectedRoomId } = useBookingStore();
+  const { selectedRoomId, currentDate, addBooking, checkConflict, prefilledFormData, setPrefilledFormData, getRoomById, getActiveRooms, setSelectedRoomId, addRecurringBookings, checkRecurrenceConflicts } = useBookingStore();
   const activeRooms = getActiveRooms();
   const [formData, setFormData] = useState({
     title: '',
@@ -49,6 +51,11 @@ export function BookingForm() {
   const [isAddingTemplate, setIsAddingTemplate] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [templateError, setTemplateError] = useState('');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('weekly');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictInfos, setConflictInfos] = useState<BookingConflictInfo[]>([]);
 
   const room = getRoomById(selectedRoomId);
 
@@ -57,7 +64,32 @@ export function BookingForm() {
       ...prev,
       date: format(currentDate, 'yyyy-MM-dd'),
     }));
+    if (!recurrenceEndDate) {
+      const defaultEnd = addWeeks(currentDate, 4);
+      setRecurrenceEndDate(format(defaultEnd, 'yyyy-MM-dd'));
+    }
   }, [currentDate]);
+
+  useEffect(() => {
+    if (formData.date && recurrenceType) {
+      const start = new Date(formData.date);
+      let defaultEnd: Date;
+      switch (recurrenceType) {
+        case 'daily':
+          defaultEnd = addDays(start, 7);
+          break;
+        case 'weekly':
+          defaultEnd = addWeeks(start, 4);
+          break;
+        case 'monthly':
+          defaultEnd = addMonths(start, 3);
+          break;
+        default:
+          defaultEnd = addWeeks(start, 4);
+      }
+      setRecurrenceEndDate(format(defaultEnd, 'yyyy-MM-dd'));
+    }
+  }, [recurrenceType, formData.date]);
 
   useEffect(() => {
     if (prefilledFormData) {
@@ -187,6 +219,88 @@ export function BookingForm() {
     setShowTemplates(false);
   };
 
+  const resetForm = () => {
+    setFormData((prev) => ({
+      ...prev,
+      title: '',
+      attendees: 1,
+      contact: '',
+      phone: '',
+      remarks: '',
+    }));
+    setIsRecurring(false);
+  };
+
+  const handleSubmitSingle = () => {
+    const result = addBooking({
+      roomId: selectedRoomId,
+      title: formData.title,
+      department: formData.department,
+      attendees: formData.attendees,
+      startTime: `${formData.date}T${formData.startTime}:00`,
+      endTime: `${formData.date}T${formData.endTime}:00`,
+      contact: formData.contact,
+      phone: formData.phone,
+      remarks: formData.remarks,
+    });
+
+    if (result.success) {
+      setSuccess(true);
+      setError('');
+      setPrefilledFormData(null);
+      setTimeout(() => setSuccess(false), 3000);
+      resetForm();
+    } else {
+      setError(result.message);
+    }
+  };
+
+  const handleSubmitRecurring = () => {
+    const conflicts = checkRecurrenceConflicts(
+      selectedRoomId,
+      formData.date,
+      recurrenceEndDate,
+      formData.startTime,
+      formData.endTime,
+      recurrenceType
+    );
+
+    const hasConflicts = conflicts.some((c) => c.hasConflict);
+
+    if (hasConflicts) {
+      setConflictInfos(conflicts);
+      setShowConflictModal(true);
+      return;
+    }
+
+    const result = addRecurringBookings(
+      {
+        roomId: selectedRoomId,
+        title: formData.title,
+        department: formData.department,
+        attendees: formData.attendees,
+        startTime: `${formData.date}T${formData.startTime}:00`,
+        endTime: `${formData.date}T${formData.endTime}:00`,
+        contact: formData.contact,
+        phone: formData.phone,
+        remarks: formData.remarks,
+      },
+      recurrenceType,
+      recurrenceEndDate,
+      false
+    );
+
+    if (result.success) {
+      setSuccess(true);
+      setError('');
+      setPrefilledFormData(null);
+      setTimeout(() => setSuccess(false), 3000);
+      resetForm();
+    } else {
+      setError(result.message);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -210,44 +324,58 @@ export function BookingForm() {
       setError('请输入联系人');
       return;
     }
-    if (conflictWarning) {
+    if (conflictWarning && !isRecurring) {
       setError(conflictWarning);
       return;
     }
 
     setIsSubmitting(true);
     
-    const result = addBooking({
-      roomId: selectedRoomId,
-      title: formData.title,
-      department: formData.department,
-      attendees: formData.attendees,
-      startTime: `${formData.date}T${formData.startTime}:00`,
-      endTime: `${formData.date}T${formData.endTime}:00`,
-      contact: formData.contact,
-      phone: formData.phone,
-      remarks: formData.remarks,
-    });
-
     setTimeout(() => {
       setIsSubmitting(false);
-      if (result.success) {
-        setSuccess(true);
-        setError('');
-        setPrefilledFormData(null);
-        setTimeout(() => setSuccess(false), 3000);
-        setFormData((prev) => ({
-          ...prev,
-          title: '',
-          attendees: 1,
-          contact: '',
-          phone: '',
-          remarks: '',
-        }));
+      if (isRecurring) {
+        handleSubmitRecurring();
       } else {
-        setError(result.message);
+        handleSubmitSingle();
       }
     }, 500);
+  };
+
+  const handleSkipConflicts = () => {
+    const result = addRecurringBookings(
+      {
+        roomId: selectedRoomId,
+        title: formData.title,
+        department: formData.department,
+        attendees: formData.attendees,
+        startTime: `${formData.date}T${formData.startTime}:00`,
+        endTime: `${formData.date}T${formData.endTime}:00`,
+        contact: formData.contact,
+        phone: formData.phone,
+        remarks: formData.remarks,
+      },
+      recurrenceType,
+      recurrenceEndDate,
+      true
+    );
+
+    setShowConflictModal(false);
+    setConflictInfos([]);
+
+    if (result.success) {
+      setSuccess(true);
+      setError('');
+      setPrefilledFormData(null);
+      setTimeout(() => setSuccess(false), 3000);
+      resetForm();
+    } else {
+      setError(result.message);
+    }
+  };
+
+  const handleCancelConflictModal = () => {
+    setShowConflictModal(false);
+    setConflictInfos([]);
   };
 
   const timeOptions = [];
@@ -530,6 +658,60 @@ export function BookingForm() {
           </div>
         </div>
 
+        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <label className="flex items-center gap-2 cursor-pointer mb-3">
+            <input
+              type="checkbox"
+              checked={isRecurring}
+              onChange={(e) => setIsRecurring(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+              <Repeat className="w-4 h-4 text-slate-400" />
+              重复预订
+            </span>
+          </label>
+
+          {isRecurring && (
+            <div className="space-y-3 pl-6">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  重复频率
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['daily', 'weekly', 'monthly'] as RecurrenceType[]).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setRecurrenceType(type)}
+                      className={`py-2 text-xs font-medium rounded-lg transition-all ${
+                        recurrenceType === type
+                          ? 'bg-blue-500 text-white shadow-sm'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {type === 'daily' ? '每天' : type === 'weekly' ? '每周' : '每月'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  结束日期
+                </label>
+                <input
+                  type="date"
+                  value={recurrenceEndDate}
+                  onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                  min={formData.date}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
             <User className="w-4 h-4 text-slate-400" />
@@ -593,6 +775,14 @@ export function BookingForm() {
           )}
         </button>
       </form>
+
+      <RecurrenceConflictModal
+        isOpen={showConflictModal}
+        onClose={handleCancelConflictModal}
+        conflicts={conflictInfos}
+        onSkipConflicts={handleSkipConflicts}
+        onCancel={handleCancelConflictModal}
+      />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { Repeat } from 'lucide-react';
 import { Booking } from '../types';
 import { formatTime } from '../utils/dateUtils';
 import { BUSINESS_START_HOUR, HOUR_HEIGHT } from '../constants';
@@ -33,8 +34,11 @@ export function BookingCard({ booking, onClick, compact = false }: BookingCardPr
         opacity: 0.9,
       }}
     >
-      <div className="text-white text-xs font-medium truncate">
-        {booking.title}
+      <div className="text-white text-xs font-medium truncate flex items-center gap-1">
+        {booking.recurrenceId && (
+          <Repeat className="w-3 h-3 flex-shrink-0" />
+        )}
+        <span className="truncate">{booking.title}</span>
       </div>
       {!compact && height > 40 && (
         <div className="text-white/80 text-xs mt-0.5 truncate">

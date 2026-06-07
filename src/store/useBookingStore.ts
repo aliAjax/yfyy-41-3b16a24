@@ -10,6 +10,9 @@ import {
   RoomFinderResult,
   CapacityMatchLevel,
   FacilityType,
+  RecurrenceType,
+  BookingConflictInfo,
+  RecurrenceBookingResult,
 } from '../types';
 import {
   getBookingsFromStorage,
@@ -24,7 +27,7 @@ import {
   addViewToStorage,
   deleteViewFromStorage,
 } from '../utils/storage';
-import { generateId, hasConflict } from '../utils/dateUtils';
+import { generateId, hasConflict, generateRecurrenceDates, getRecurrenceBookings } from '../utils/dateUtils';
 import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
 import {
   ADJACENT_SEARCH_STEP_MINUTES,
@@ -76,6 +79,12 @@ interface BookingStore {
   deleteBooking: (id: string) => void;
   checkConflict: (roomId: string, startTime: string, endTime: string, excludeId?: string) => boolean;
   findAvailableRooms: (date: string, startTime: string, endTime: string, attendees: number, facilities?: FacilityType[]) => RoomFinderResult;
+
+  checkRecurrenceConflicts: (roomId: string, startDate: string, endDate: string, startTime: string, endTime: string, type: RecurrenceType) => BookingConflictInfo[];
+  addRecurringBookings: (data: BookingFormData, type: RecurrenceType, recurrenceEndDate: string, skipConflicts?: boolean) => RecurrenceBookingResult;
+  deleteRecurrenceSeries: (recurrenceId: string) => { success: boolean; deletedCount: number; message: string };
+  updateRecurrenceSeries: (recurrenceId: string, data: BookingFormData, skipConflicts?: boolean) => RecurrenceBookingResult;
+  getRecurrenceBookings: (recurrenceId: string) => Booking[];
   getCapacityMatchInfo: (roomCapacity: number, attendees: number) => { level: CapacityMatchLevel; text: string; diff: number };
 
   addRoom: (room: Omit<MeetingRoom, 'id' | 'status'>) => MeetingRoom;
@@ -296,6 +305,233 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const updatedBookings = bookings.filter((b) => b.id !== id);
     saveBookingsToStorage(updatedBookings);
     set({ bookings: updatedBookings, selectedBooking: null, isModalOpen: false });
+  },
+
+  checkRecurrenceConflicts: (roomId, startDate, endDate, startTime, endTime, type) => {
+    const { bookings } = get();
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T23:59:59`);
+
+    const dates = generateRecurrenceDates(start, end, type);
+
+    return dates.map((date) => {
+      const dateStr = date.toISOString().split('T')[0];
+      const startDateTime = new Date(`${dateStr}T${startTime}:00`);
+      const endDateTime = new Date(`${dateStr}T${endTime}:00`);
+
+      const conflictBooking = bookings.find((b) => {
+        if (b.roomId !== roomId) return false;
+        const bStart = new Date(b.startTime);
+        const bEnd = new Date(b.endTime);
+        return startDateTime < bEnd && endDateTime > bStart;
+      });
+
+      return {
+        date: dateStr,
+        startTime,
+        endTime,
+        hasConflict: !!conflictBooking,
+        conflictWith: conflictBooking,
+      };
+    });
+  },
+
+  addRecurringBookings: (data, type, recurrenceEndDate, skipConflicts = false) => {
+    const { bookings, getRoomById } = get();
+    const startDate = new Date(data.startTime);
+    const endDate = new Date(recurrenceEndDate);
+    const room = getRoomById(data.roomId);
+
+    if (!room) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '会议室不存在' };
+    }
+    if (room.status === 'inactive') {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '该会议室已停用，无法新建预定' };
+    }
+    if (data.attendees > room.capacity) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: `参会人数超出会议室容量（最多${room.capacity}人）` };
+    }
+
+    const startTimeStr = startDate.toTimeString().slice(0, 5);
+    const endTimeStr = new Date(data.endTime).toTimeString().slice(0, 5);
+
+    const conflictInfos = get().checkRecurrenceConflicts(
+      data.roomId,
+      startDate.toISOString().split('T')[0],
+      recurrenceEndDate,
+      startTimeStr,
+      endTimeStr,
+      type
+    );
+
+    const totalCount = conflictInfos.length;
+    const conflictCount = conflictInfos.filter((c) => c.hasConflict).length;
+
+    if (!skipConflicts && conflictCount > 0) {
+      return {
+        success: false,
+        totalCount,
+        successCount: 0,
+        conflictCount,
+        message: `共 ${totalCount} 场预定，其中 ${conflictCount} 场存在冲突`,
+      };
+    }
+
+    const recurrenceId = `rec-${generateId()}`;
+    const now = new Date().toISOString();
+    let index = 0;
+    const createdBookings: Booking[] = [];
+
+    for (const info of conflictInfos) {
+      if (info.hasConflict && skipConflicts) continue;
+
+      const newBooking: Booking = {
+        id: generateId(),
+        roomId: data.roomId,
+        title: data.title,
+        department: data.department,
+        attendees: data.attendees,
+        startTime: `${info.date}T${info.startTime}:00`,
+        endTime: `${info.date}T${info.endTime}:00`,
+        contact: data.contact,
+        phone: data.phone,
+        remarks: data.remarks,
+        createdAt: now,
+        recurrenceId,
+        recurrenceType: type,
+        recurrenceEndDate,
+        recurrenceIndex: index,
+      };
+
+      createdBookings.push(newBooking);
+      index++;
+    }
+
+    const updatedBookings = [...bookings, ...createdBookings];
+    saveBookingsToStorage(updatedBookings);
+    set({ bookings: updatedBookings });
+
+    return {
+      success: true,
+      totalCount,
+      successCount: createdBookings.length,
+      conflictCount,
+      message: `成功创建 ${createdBookings.length} 场重复预定${skipConflicts && conflictCount > 0 ? `（跳过 ${conflictCount} 场冲突）` : ''}`,
+      createdBookings,
+    };
+  },
+
+  deleteRecurrenceSeries: (recurrenceId) => {
+    const { bookings } = get();
+    const seriesBookings = bookings.filter((b) => b.recurrenceId === recurrenceId);
+    const deletedCount = seriesBookings.length;
+
+    if (deletedCount === 0) {
+      return { success: false, deletedCount: 0, message: '未找到重复预订系列' };
+    }
+
+    const updatedBookings = bookings.filter((b) => b.recurrenceId !== recurrenceId);
+    saveBookingsToStorage(updatedBookings);
+    set({ bookings: updatedBookings, selectedBooking: null, isModalOpen: false });
+
+    return { success: true, deletedCount, message: `成功取消 ${deletedCount} 场重复预定` };
+  },
+
+  updateRecurrenceSeries: (recurrenceId, data, skipConflicts = false) => {
+    const { bookings, getRoomById } = get();
+    const room = getRoomById(data.roomId);
+    const existingSeries = bookings.filter((b) => b.recurrenceId === recurrenceId);
+
+    if (existingSeries.length === 0) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '未找到重复预订系列' };
+    }
+
+    if (!room) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '会议室不存在' };
+    }
+    if (room.status === 'inactive') {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '该会议室已停用' };
+    }
+    if (data.attendees > room.capacity) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: `参会人数超出会议室容量（最多${room.capacity}人）` };
+    }
+
+    const recurrenceEndDate = existingSeries[0].recurrenceEndDate || data.startTime.split('T')[0];
+    const startDate = new Date(data.startTime);
+    const startTimeStr = startDate.toTimeString().slice(0, 5);
+    const endTimeStr = new Date(data.endTime).toTimeString().slice(0, 5);
+    const type = existingSeries[0].recurrenceType || 'daily';
+
+    const conflictInfos = get().checkRecurrenceConflicts(
+      data.roomId,
+      startDate.toISOString().split('T')[0],
+      recurrenceEndDate,
+      startTimeStr,
+      endTimeStr,
+      type
+    );
+
+    const totalCount = conflictInfos.length;
+    const conflictCount = conflictInfos.filter((c) => c.hasConflict).length;
+
+    if (!skipConflicts && conflictCount > 0) {
+      return {
+        success: false,
+        totalCount,
+        successCount: 0,
+        conflictCount,
+        message: `共 ${totalCount} 场预定，其中 ${conflictCount} 场存在冲突`,
+      };
+    }
+
+    const now = new Date().toISOString();
+    let index = 0;
+    const updatedBookingsList: Booking[] = [];
+    const bookingsWithoutOldSeries = bookings.filter((b) => b.recurrenceId !== recurrenceId);
+
+    for (const info of conflictInfos) {
+      if (info.hasConflict && skipConflicts) continue;
+
+      const existingBooking = existingSeries[index];
+      const newBooking: Booking = {
+        id: existingBooking ? existingBooking.id : generateId(),
+        roomId: data.roomId,
+        title: data.title,
+        department: data.department,
+        attendees: data.attendees,
+        startTime: `${info.date}T${info.startTime}:00`,
+        endTime: `${info.date}T${info.endTime}:00`,
+        contact: data.contact,
+        phone: data.phone,
+        remarks: data.remarks,
+        createdAt: existingBooking ? existingBooking.createdAt : now,
+        recurrenceId,
+        recurrenceType: type,
+        recurrenceEndDate,
+        recurrenceIndex: index,
+      };
+
+      updatedBookingsList.push(newBooking);
+      index++;
+    }
+
+    const finalBookings = [...bookingsWithoutOldSeries, ...updatedBookingsList];
+    saveBookingsToStorage(finalBookings);
+    set({ bookings: finalBookings });
+
+    return {
+      success: true,
+      totalCount,
+      successCount: updatedBookingsList.length,
+      conflictCount,
+      message: `成功更新 ${updatedBookingsList.length} 场重复预定${skipConflicts && conflictCount > 0 ? `（跳过 ${conflictCount} 场冲突）` : ''}`,
+      createdBookings: updatedBookingsList,
+    };
+  },
+
+  getRecurrenceBookings: (recurrenceId) => {
+    const { bookings } = get();
+    return getRecurrenceBookings(bookings, recurrenceId);
   },
 
   checkConflict: (roomId, startTime, endTime, excludeId) => {

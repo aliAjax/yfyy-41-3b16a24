@@ -1,6 +1,6 @@
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, startOfDay, endOfDay, addWeeks, addMonths, isBefore, isAfter } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { Booking } from '../types';
+import { Booking, RecurrenceType, BookingConflictInfo } from '../types';
 
 export function formatDate(date: Date, pattern: string): string {
   return format(date, pattern, { locale: zhCN });
@@ -116,4 +116,89 @@ export function computeDefaultEndTime(
   }
 
   return endTime;
+}
+
+export function generateRecurrenceDates(
+  startDate: Date,
+  endDate: Date,
+  type: RecurrenceType
+): Date[] {
+  const dates: Date[] = [];
+  let current = new Date(startDate);
+
+  while (!isAfter(current, endDate)) {
+    dates.push(new Date(current));
+
+    switch (type) {
+      case 'daily':
+        current = addDays(current, 1);
+        break;
+      case 'weekly':
+        current = addWeeks(current, 1);
+        break;
+      case 'monthly':
+        current = addMonths(current, 1);
+        break;
+    }
+  }
+
+  return dates;
+}
+
+export function checkRecurrenceConflicts(
+  bookings: Booking[],
+  roomId: string,
+  startDate: Date,
+  endDate: Date,
+  startTimeStr: string,
+  endTimeStr: string,
+  type: RecurrenceType
+): BookingConflictInfo[] {
+  const dates = generateRecurrenceDates(startDate, endDate, type);
+
+  return dates.map((date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const startDateTime = new Date(`${dateStr}T${startTimeStr}:00`);
+    const endDateTime = new Date(`${dateStr}T${endTimeStr}:00`);
+
+    const conflictBooking = bookings.find((b) => {
+      if (b.roomId !== roomId) return false;
+      const bStart = new Date(b.startTime);
+      const bEnd = new Date(b.endTime);
+      return startDateTime < bEnd && endDateTime > bStart;
+    });
+
+    return {
+      date: dateStr,
+      startTime: startTimeStr,
+      endTime: endTimeStr,
+      hasConflict: !!conflictBooking,
+      conflictWith: conflictBooking,
+    };
+  });
+}
+
+export function getRecurrenceBookings(
+  bookings: Booking[],
+  recurrenceId: string
+): Booking[] {
+  return bookings
+    .filter((b) => b.recurrenceId === recurrenceId)
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+}
+
+export function isPartOfRecurrenceSeries(booking: Booking): boolean {
+  return !!booking.recurrenceId;
+}
+
+export function getRecurrenceText(booking: Booking): string {
+  if (!booking.recurrenceId || !booking.recurrenceType) return '';
+
+  const typeTexts: Record<RecurrenceType, string> = {
+    daily: '每天',
+    weekly: '每周',
+    monthly: '每月',
+  };
+
+  return typeTexts[booking.recurrenceType] || '';
 }

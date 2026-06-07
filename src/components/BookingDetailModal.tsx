@@ -16,11 +16,14 @@ import {
   AlertCircle,
   FileText,
   Copy,
+  Repeat,
+  Layers,
 } from 'lucide-react';
-import { Booking } from '../types';
+import { Booking, BookingConflictInfo } from '../types';
 import { useBookingStore } from '../store/useBookingStore';
-import { formatDateTime, formatTime } from '../utils/dateUtils';
+import { formatDateTime, formatTime, getRecurrenceText } from '../utils/dateUtils';
 import { format } from 'date-fns';
+import { RecurrenceConflictModal } from './RecurrenceConflictModal';
 
 interface BookingDetailModalProps {
   booking: Booking | null;
@@ -43,24 +46,32 @@ interface EditFormData {
 }
 
 export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: BookingDetailModalProps) {
-  const { getRoomById, getActiveRooms, updateBooking, checkConflict, setPrefilledFormData, setIsModalOpen, setSelectedBooking } = useBookingStore();
+  const { getRoomById, getActiveRooms, updateBooking, checkConflict, setPrefilledFormData, setIsModalOpen, setSelectedBooking, getRecurrenceBookings, deleteRecurrenceSeries, updateRecurrenceSeries, checkRecurrenceConflicts } = useBookingStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [editMode, setEditMode] = useState<'single' | 'series'>('single');
   const [formData, setFormData] = useState<EditFormData | null>(null);
   const [error, setError] = useState('');
   const [conflictWarning, setConflictWarning] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictInfos, setConflictInfos] = useState<BookingConflictInfo[]>([]);
 
   const activeRooms = getActiveRooms();
 
   useEffect(() => {
     if (!isOpen) {
       setIsEditing(false);
+      setEditMode('single');
       setFormData(null);
       setError('');
       setConflictWarning('');
       setIsSubmitting(false);
       setSuccessMessage('');
+      setShowDeleteConfirm(false);
+      setShowConflictModal(false);
+      setConflictInfos([]);
     }
   }, [isOpen]);
 
@@ -90,9 +101,29 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
     }
   };
 
+  const isRecurring = booking?.recurrenceId ? true : false;
+  const seriesBookings = booking?.recurrenceId ? getRecurrenceBookings(booking.recurrenceId) : [];
+  const seriesCount = seriesBookings.length;
+
+  const handleDeleteSingle = () => {
+    onDelete(booking.id);
+    setShowDeleteConfirm(false);
+  };
+
+  const handleDeleteSeries = () => {
+    if (booking?.recurrenceId) {
+      deleteRecurrenceSeries(booking.recurrenceId);
+    }
+    setShowDeleteConfirm(false);
+  };
+
   const handleDelete = () => {
-    if (window.confirm('确定要取消这个预定吗？')) {
-      onDelete(booking.id);
+    if (isRecurring) {
+      setShowDeleteConfirm(true);
+    } else {
+      if (window.confirm('确定要取消这个预定吗？')) {
+        onDelete(booking.id);
+      }
     }
   };
 
@@ -148,6 +179,125 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
     setSuccessMessage('');
   };
 
+  const handleSaveSingle = () => {
+    if (!formData || !booking) return;
+
+    const result = updateBooking(booking.id, {
+      roomId: formData.roomId,
+      title: formData.title,
+      department: formData.department,
+      attendees: formData.attendees,
+      startTime: `${formData.date}T${formData.startTime}:00`,
+      endTime: `${formData.date}T${formData.endTime}:00`,
+      contact: formData.contact,
+      phone: formData.phone,
+      remarks: formData.remarks,
+    });
+
+    if (result.success) {
+      setSuccessMessage(result.message);
+      setError('');
+      setTimeout(() => {
+        setIsEditing(false);
+        setFormData(null);
+        setSuccessMessage('');
+      }, 1500);
+    } else {
+      setError(result.message);
+    }
+  };
+
+  const handleSaveSeries = () => {
+    if (!formData || !booking || !booking.recurrenceId) return;
+
+    const recurrenceEndDate = booking.recurrenceEndDate || formData.date;
+
+    const conflicts = checkRecurrenceConflicts(
+      formData.roomId,
+      formData.date,
+      recurrenceEndDate,
+      formData.startTime,
+      formData.endTime,
+      booking.recurrenceType || 'weekly'
+    );
+
+    const hasConflicts = conflicts.some((c) => c.hasConflict);
+
+    if (hasConflicts) {
+      setConflictInfos(conflicts);
+      setShowConflictModal(true);
+      return;
+    }
+
+    const result = updateRecurrenceSeries(
+      booking.recurrenceId,
+      {
+        roomId: formData.roomId,
+        title: formData.title,
+        department: formData.department,
+        attendees: formData.attendees,
+        startTime: `${formData.date}T${formData.startTime}:00`,
+        endTime: `${formData.date}T${formData.endTime}:00`,
+        contact: formData.contact,
+        phone: formData.phone,
+        remarks: formData.remarks,
+      },
+      false
+    );
+
+    if (result.success) {
+      setSuccessMessage(result.message);
+      setError('');
+      setTimeout(() => {
+        setIsEditing(false);
+        setFormData(null);
+        setSuccessMessage('');
+      }, 1500);
+    } else {
+      setError(result.message);
+    }
+  };
+
+  const handleSkipConflicts = () => {
+    if (!formData || !booking || !booking.recurrenceId) return;
+
+    const result = updateRecurrenceSeries(
+      booking.recurrenceId,
+      {
+        roomId: formData.roomId,
+        title: formData.title,
+        department: formData.department,
+        attendees: formData.attendees,
+        startTime: `${formData.date}T${formData.startTime}:00`,
+        endTime: `${formData.date}T${formData.endTime}:00`,
+        contact: formData.contact,
+        phone: formData.phone,
+        remarks: formData.remarks,
+      },
+      true
+    );
+
+    setShowConflictModal(false);
+    setConflictInfos([]);
+
+    if (result.success) {
+      setSuccessMessage(result.message);
+      setError('');
+      setTimeout(() => {
+        setIsEditing(false);
+        setFormData(null);
+        setSuccessMessage('');
+      }, 1500);
+    } else {
+      setError(result.message);
+    }
+  };
+
+  const handleCancelConflictModal = () => {
+    setShowConflictModal(false);
+    setConflictInfos([]);
+  };
+
   const handleSave = () => {
     if (!formData) return;
 
@@ -171,37 +321,19 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
       setError('请输入联系人');
       return;
     }
-    if (conflictWarning) {
+    if (conflictWarning && editMode === 'single') {
       setError(conflictWarning);
       return;
     }
 
     setIsSubmitting(true);
 
-    const result = updateBooking(booking.id, {
-      roomId: formData.roomId,
-      title: formData.title,
-      department: formData.department,
-      attendees: formData.attendees,
-      startTime: `${formData.date}T${formData.startTime}:00`,
-      endTime: `${formData.date}T${formData.endTime}:00`,
-      contact: formData.contact,
-      phone: formData.phone,
-      remarks: formData.remarks,
-    });
-
     setTimeout(() => {
       setIsSubmitting(false);
-      if (result.success) {
-        setSuccessMessage(result.message);
-        setError('');
-        setTimeout(() => {
-          setIsEditing(false);
-          setFormData(null);
-          setSuccessMessage('');
-        }, 1500);
+      if (editMode === 'series' && isRecurring) {
+        handleSaveSeries();
       } else {
-        setError(result.message);
+        handleSaveSingle();
       }
     }, 500);
   };
@@ -336,6 +468,39 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
                 />
               </div>
 
+              {isRecurring && (
+                <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                  <p className="text-xs font-medium text-blue-700 mb-2 flex items-center gap-1.5">
+                    <Repeat className="w-3.5 h-3.5" />
+                    这是重复预订系列中的一场
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditMode('single')}
+                      className={`py-2 text-xs font-medium rounded-lg transition-all ${
+                        editMode === 'single'
+                          ? 'bg-blue-500 text-white shadow-sm'
+                          : 'bg-white text-slate-600 border border-blue-200 hover:border-blue-400'
+                      }`}
+                    >
+                      仅修改此场
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditMode('series')}
+                      className={`py-2 text-xs font-medium rounded-lg transition-all ${
+                        editMode === 'series'
+                          ? 'bg-blue-500 text-white shadow-sm'
+                          : 'bg-white text-slate-600 border border-blue-200 hover:border-blue-400'
+                      }`}
+                    >
+                      修改整个系列
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-slate-400" />
@@ -346,7 +511,8 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
                   name="date"
                   value={formData.date}
                   onChange={handleFormChange}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  disabled={editMode === 'series' && isRecurring}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-slate-100 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -469,6 +635,26 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
                 </p>
               </div>
 
+              {isRecurring && (
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Repeat className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm font-medium text-blue-700">重复预订系列</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-blue-600">
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>
+                      {getRecurrenceText(booking)} · 共 {seriesCount} 场
+                    </span>
+                  </div>
+                  {booking.recurrenceEndDate && (
+                    <p className="text-xs text-blue-500 mt-1">
+                      至 {booking.recurrenceEndDate} 结束
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <Building2 className="w-5 h-5 text-slate-400 flex-shrink-0" />
@@ -541,7 +727,7 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
               </button>
               <button
                 onClick={handleSave}
-                disabled={isSubmitting || !!conflictWarning}
+                disabled={isSubmitting || (!!conflictWarning && editMode === 'single')}
                 className="flex-1 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:shadow-none"
               >
                 {isSubmitting ? (
@@ -552,44 +738,104 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
                 ) : (
                   <>
                     <Save className="w-4 h-4" />
-                    保存修改
+                    {editMode === 'series' && isRecurring ? '保存系列' : '保存修改'}
                   </>
                 )}
               </button>
             </>
           ) : (
-            <>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={onClose}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-colors"
+                className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-colors"
               >
                 关闭
               </button>
               <button
                 onClick={handleCopyBooking}
-                className="flex-1 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                className="py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 <Copy className="w-4 h-4" />
-                复制预订
+                复制
               </button>
               <button
                 onClick={handleStartEdit}
-                className="flex-1 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                className="py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 <Edit3 className="w-4 h-4" />
                 编辑改期
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                className="py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 <Trash2 className="w-4 h-4" />
-                取消预定
+                {isRecurring ? '取消系列' : '取消预定'}
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
+
+      {showDeleteConfirm && booking && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+          onClick={() => setShowDeleteConfirm(false)}
+          style={{ animation: 'fadeIn 0.2s ease-out' }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            style={{ animation: 'slideUp 0.3s ease-out' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-800">取消重复预订</h3>
+                  <p className="text-sm text-slate-500">共 {seriesCount} 场预定</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                请选择要取消的范围：
+              </p>
+              <div className="space-y-2">
+                <button
+                  onClick={handleDeleteSingle}
+                  className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium rounded-xl transition-colors text-left flex items-center justify-between"
+                >
+                  <span>仅取消这一场</span>
+                  <span className="text-xs text-slate-400">1 场</span>
+                </button>
+                <button
+                  onClick={handleDeleteSeries}
+                  className="w-full py-3 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-xl transition-colors text-left flex items-center justify-between"
+                >
+                  <span>取消整个系列</span>
+                  <span className="text-xs text-red-400">{seriesCount} 场</span>
+                </button>
+              </div>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="w-full mt-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-colors"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <RecurrenceConflictModal
+        isOpen={showConflictModal}
+        onClose={handleCancelConflictModal}
+        conflicts={conflictInfos}
+        onSkipConflicts={handleSkipConflicts}
+        onCancel={handleCancelConflictModal}
+        title="更新冲突预览"
+      />
     </div>
   );
 }

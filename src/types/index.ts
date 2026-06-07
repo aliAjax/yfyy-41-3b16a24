@@ -18,6 +18,8 @@ export interface MeetingRoom {
   facilities: FacilityType[];
 }
 
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly';
+
 export interface Booking {
   id: string;
   roomId: string;
@@ -30,6 +32,10 @@ export interface Booking {
   phone: string;
   remarks?: string;
   createdAt: string;
+  recurrenceId?: string;
+  recurrenceType?: RecurrenceType;
+  recurrenceEndDate?: string;
+  recurrenceIndex?: number;
 }
 
 export type ViewMode = 'day' | 'week';
@@ -64,6 +70,29 @@ export interface BookingFormData {
   contact: string;
   phone: string;
   remarks: string;
+}
+
+export interface RecurrenceFormData {
+  isRecurring: boolean;
+  type: RecurrenceType;
+  endDate: string;
+}
+
+export interface BookingConflictInfo {
+  date: string;
+  startTime: string;
+  endTime: string;
+  hasConflict: boolean;
+  conflictWith?: Booking;
+}
+
+export interface RecurrenceBookingResult {
+  success: boolean;
+  totalCount: number;
+  successCount: number;
+  conflictCount: number;
+  message: string;
+  createdBookings?: Booking[];
 }
 
 export interface BookingTemplate {
