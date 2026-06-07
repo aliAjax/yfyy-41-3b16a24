@@ -8,12 +8,12 @@ export function DepartmentFilter() {
   const allDepartments = ['all', ...departments];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-3">
+    <div className="rounded-xl p-2 md:p-3">
       <div className="flex items-center gap-2 mb-2">
-        <Building2 className="w-4 h-4 text-slate-500" />
-        <span className="text-sm font-medium text-slate-700">科室筛选</span>
+        <Building2 className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-500" />
+        <span className="text-xs md:text-sm font-medium text-slate-700">科室筛选</span>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5 md:gap-2">
         {allDepartments.map((dept) => {
           const isSelected = selectedDepartment === dept;
           const label = dept === 'all' ? '全部' : dept;
@@ -22,7 +22,7 @@ export function DepartmentFilter() {
             <button
               key={dept}
               onClick={() => setSelectedDepartment(dept)}
-              className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all duration-200 ${
+              className={`px-2 py-1 text-xs rounded-lg font-medium transition-all duration-200 ${
                 isSelected
                   ? 'bg-blue-500 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'

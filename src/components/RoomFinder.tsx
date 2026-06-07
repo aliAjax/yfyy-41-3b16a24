@@ -166,10 +166,10 @@ export function RoomFinder({ embedded = false }: RoomFinderProps) {
         'flex flex-col overflow-hidden',
         embedded
           ? 'w-full h-full'
-          : 'w-80 bg-white rounded-2xl shadow-sm border border-slate-100 max-h-[45vh]'
+          : 'w-full min-w-0 bg-white rounded-2xl shadow-sm border border-slate-100 max-h-[45vh]'
       )}
     >
-      <div className="p-6 pb-4">
+      <div className="p-4 md:p-6 pb-3 md:pb-4">
         <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
           <div className="w-1 h-5 bg-purple-500 rounded-full"></div>
           空闲会议室查找

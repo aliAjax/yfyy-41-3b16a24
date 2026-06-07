@@ -37,15 +37,15 @@ export function ViewSelector() {
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="text-sm font-medium text-slate-500">常用视图:</div>
+    <div className="flex items-center gap-2 flex-wrap">
+      <div className="text-xs md:text-sm font-medium text-slate-500">常用视图:</div>
       
-      <div className="flex items-center gap-1">
-        {savedViews.slice(0, 4).map((view) => (
+      <div className="flex items-center gap-1 flex-wrap">
+        {savedViews.slice(0, 3).map((view) => (
           <button
             key={view.id}
             onClick={() => handleViewClick(view)}
-            className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all duration-200 flex items-center gap-1 ${
+            className={`px-2 py-1 text-xs rounded-lg font-medium transition-all duration-200 ${
               view.id === activeViewId
                 ? 'bg-blue-500 text-white shadow-sm'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'

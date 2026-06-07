@@ -25,18 +25,18 @@ export function RoomRanking({ embedded = false }: RoomRankingProps) {
   return (
     <div
       className={cn(
-        'flex flex-col',
+        'flex flex-col h-full',
         embedded
           ? 'w-full p-4'
-          : 'w-64 bg-white rounded-2xl shadow-sm border border-slate-100 p-4'
+          : 'w-full min-w-0 bg-white rounded-2xl shadow-sm border border-slate-100 p-3 md:p-4'
       )}
     >
-      <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-        <div className="w-1 h-5 bg-purple-500 rounded-full"></div>
+      <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-3 md:mb-4 flex items-center gap-2">
+        <div className="w-1 h-4 md:h-5 bg-purple-500 rounded-full"></div>
         会议室使用排行
       </h2>
 
-      <div className="space-y-3 flex-1 overflow-y-auto">
+      <div className="space-y-2 md:space-y-3 flex-1 overflow-y-auto">
         {roomStats.map((room, index) => {
           const isSelected = selectedRoomId === room.roomId;
           const countBarWidth = (room.bookingCount / maxBookingCount) * 100;
@@ -47,13 +47,13 @@ export function RoomRanking({ embedded = false }: RoomRankingProps) {
               key={room.roomId}
               onClick={() => handleRoomClick(room.roomId)}
               className={cn(
-                'w-full p-3 rounded-xl text-left transition-all duration-200 border-2',
+                'w-full p-2.5 md:p-3 rounded-xl text-left transition-all duration-200 border-2',
                 isSelected
                   ? 'border-purple-500 bg-purple-50 shadow-md'
                   : 'border-transparent bg-slate-50 hover:bg-slate-100'
               )}
             >
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-1.5 md:gap-2 mb-2">
                 <div className="flex items-center justify-center w-5 h-5">
                   {index < 3 ? (
                     <span

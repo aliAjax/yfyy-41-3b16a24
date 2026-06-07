@@ -76,9 +76,9 @@ export default function Home() {
             )}
           </div>
 
-          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[256px_1fr_320px] xl:grid-cols-[256px_1fr_320px] gap-3 sm:gap-4 md:gap-6 min-w-0">
+          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[200px_1fr_260px] lg:grid-cols-[240px_1fr_300px] xl:grid-cols-[256px_1fr_320px] gap-3 sm:gap-4 md:gap-5 lg:gap-6 min-w-0">
             <div
-              className="hidden md:flex h-full flex-col gap-4 min-h-0"
+              className="hidden md:flex h-full flex-col gap-3 md:gap-4 min-h-0"
               style={{ animation: 'slideInLeft 0.5s ease-out' }}
             >
               <div className="flex-shrink-0">
@@ -97,7 +97,7 @@ export default function Home() {
             </div>
 
             <div
-              className="hidden xl:flex h-full flex-col gap-4 min-h-0"
+              className="hidden xl:flex h-full flex-col gap-3 md:gap-4 min-h-0"
               style={{ animation: 'slideInRight 0.5s ease-out' }}
             >
               <div className="flex-shrink-0">
