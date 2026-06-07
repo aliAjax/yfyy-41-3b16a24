@@ -1,4 +1,4 @@
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, startOfDay, endOfDay, addWeeks, addMonths, isBefore, isAfter } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, startOfDay, endOfDay, addWeeks, addMonths, isAfter } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { Booking, RecurrenceType, BookingConflictInfo } from '../types';
 
@@ -145,6 +145,13 @@ export function generateRecurrenceDates(
   return dates;
 }
 
+export function formatDateToLocalString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function checkRecurrenceConflicts(
   bookings: Booking[],
   roomId: string,
@@ -152,17 +159,19 @@ export function checkRecurrenceConflicts(
   endDate: Date,
   startTimeStr: string,
   endTimeStr: string,
-  type: RecurrenceType
+  type: RecurrenceType,
+  excludeRecurrenceId?: string
 ): BookingConflictInfo[] {
   const dates = generateRecurrenceDates(startDate, endDate, type);
 
   return dates.map((date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
+    const dateStr = formatDateToLocalString(date);
     const startDateTime = new Date(`${dateStr}T${startTimeStr}:00`);
     const endDateTime = new Date(`${dateStr}T${endTimeStr}:00`);
 
     const conflictBooking = bookings.find((b) => {
       if (b.roomId !== roomId) return false;
+      if (excludeRecurrenceId && b.recurrenceId === excludeRecurrenceId) return false;
       const bStart = new Date(b.startTime);
       const bEnd = new Date(b.endTime);
       return startDateTime < bEnd && endDateTime > bStart;

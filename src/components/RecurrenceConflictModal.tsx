@@ -1,6 +1,5 @@
 import { X, AlertTriangle, CheckCircle, XCircle, SkipForward, Ban } from 'lucide-react';
 import { BookingConflictInfo } from '../types';
-import { formatDateTime } from '../utils/dateUtils';
 
 interface RecurrenceConflictModalProps {
   isOpen: boolean;

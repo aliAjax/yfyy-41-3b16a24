@@ -88,7 +88,7 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
     } else {
       setConflictWarning('');
     }
-  }, [formData?.startTime, formData?.endTime, formData?.date, formData?.roomId, isEditing, booking, checkConflict]);
+  }, [formData, isEditing, booking, checkConflict]);
 
   if (!isOpen || !booking) return null;
 
@@ -218,7 +218,8 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
       recurrenceEndDate,
       formData.startTime,
       formData.endTime,
-      booking.recurrenceType || 'weekly'
+      booking.recurrenceType || 'weekly',
+      booking.recurrenceId
     );
 
     const hasConflicts = conflicts.some((c) => c.hasConflict);

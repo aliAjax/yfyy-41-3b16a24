@@ -27,7 +27,7 @@ import {
   addViewToStorage,
   deleteViewFromStorage,
 } from '../utils/storage';
-import { generateId, hasConflict, generateRecurrenceDates, getRecurrenceBookings } from '../utils/dateUtils';
+import { generateId, hasConflict, generateRecurrenceDates, getRecurrenceBookings, formatDateToLocalString } from '../utils/dateUtils';
 import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
 import {
   ADJACENT_SEARCH_STEP_MINUTES,
@@ -80,7 +80,7 @@ interface BookingStore {
   checkConflict: (roomId: string, startTime: string, endTime: string, excludeId?: string) => boolean;
   findAvailableRooms: (date: string, startTime: string, endTime: string, attendees: number, facilities?: FacilityType[]) => RoomFinderResult;
 
-  checkRecurrenceConflicts: (roomId: string, startDate: string, endDate: string, startTime: string, endTime: string, type: RecurrenceType) => BookingConflictInfo[];
+  checkRecurrenceConflicts: (roomId: string, startDate: string, endDate: string, startTime: string, endTime: string, type: RecurrenceType, excludeRecurrenceId?: string) => BookingConflictInfo[];
   addRecurringBookings: (data: BookingFormData, type: RecurrenceType, recurrenceEndDate: string, skipConflicts?: boolean) => RecurrenceBookingResult;
   deleteRecurrenceSeries: (recurrenceId: string) => { success: boolean; deletedCount: number; message: string };
   updateRecurrenceSeries: (recurrenceId: string, data: BookingFormData, skipConflicts?: boolean) => RecurrenceBookingResult;
@@ -307,7 +307,7 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     set({ bookings: updatedBookings, selectedBooking: null, isModalOpen: false });
   },
 
-  checkRecurrenceConflicts: (roomId, startDate, endDate, startTime, endTime, type) => {
+  checkRecurrenceConflicts: (roomId, startDate, endDate, startTime, endTime, type, excludeRecurrenceId) => {
     const { bookings } = get();
     const start = new Date(`${startDate}T00:00:00`);
     const end = new Date(`${endDate}T23:59:59`);
@@ -315,12 +315,13 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const dates = generateRecurrenceDates(start, end, type);
 
     return dates.map((date) => {
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatDateToLocalString(date);
       const startDateTime = new Date(`${dateStr}T${startTime}:00`);
       const endDateTime = new Date(`${dateStr}T${endTime}:00`);
 
       const conflictBooking = bookings.find((b) => {
         if (b.roomId !== roomId) return false;
+        if (excludeRecurrenceId && b.recurrenceId === excludeRecurrenceId) return false;
         const bStart = new Date(b.startTime);
         const bEnd = new Date(b.endTime);
         return startDateTime < bEnd && endDateTime > bStart;
@@ -338,8 +339,9 @@ export const useBookingStore = create<BookingStore>((set, get) => {
 
   addRecurringBookings: (data, type, recurrenceEndDate, skipConflicts = false) => {
     const { bookings, getRoomById } = get();
-    const startDate = new Date(data.startTime);
-    const endDate = new Date(recurrenceEndDate);
+    const startDateTime = new Date(data.startTime);
+    const endDateTime = new Date(data.endTime);
+    const recurEndDate = new Date(recurrenceEndDate);
     const room = getRoomById(data.roomId);
 
     if (!room) {
@@ -351,13 +353,21 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     if (data.attendees > room.capacity) {
       return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: `参会人数超出会议室容量（最多${room.capacity}人）` };
     }
+    if (startDateTime >= endDateTime) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '结束时间必须晚于开始时间' };
+    }
+    if (recurEndDate < startDateTime) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '重复结束日期不能早于开始日期' };
+    }
 
-    const startTimeStr = startDate.toTimeString().slice(0, 5);
-    const endTimeStr = new Date(data.endTime).toTimeString().slice(0, 5);
+    const startTimeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`;
+    const endTimeStr = `${String(endDateTime.getHours()).padStart(2, '0')}:${String(endDateTime.getMinutes()).padStart(2, '0')}`;
+
+    const startDateStr = formatDateToLocalString(startDateTime);
 
     const conflictInfos = get().checkRecurrenceConflicts(
       data.roomId,
-      startDate.toISOString().split('T')[0],
+      startDateStr,
       recurrenceEndDate,
       startTimeStr,
       endTimeStr,
@@ -366,6 +376,10 @@ export const useBookingStore = create<BookingStore>((set, get) => {
 
     const totalCount = conflictInfos.length;
     const conflictCount = conflictInfos.filter((c) => c.hasConflict).length;
+
+    if (totalCount === 0) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '没有有效的预定日期' };
+    }
 
     if (!skipConflicts && conflictCount > 0) {
       return {
@@ -405,6 +419,10 @@ export const useBookingStore = create<BookingStore>((set, get) => {
 
       createdBookings.push(newBooking);
       index++;
+    }
+
+    if (createdBookings.length === 0) {
+      return { success: false, totalCount, successCount: 0, conflictCount, message: '所有场次都有冲突，无法创建' };
     }
 
     const updatedBookings = [...bookings, ...createdBookings];
@@ -456,23 +474,39 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: `参会人数超出会议室容量（最多${room.capacity}人）` };
     }
 
-    const recurrenceEndDate = existingSeries[0].recurrenceEndDate || data.startTime.split('T')[0];
-    const startDate = new Date(data.startTime);
-    const startTimeStr = startDate.toTimeString().slice(0, 5);
-    const endTimeStr = new Date(data.endTime).toTimeString().slice(0, 5);
+    const startDateTime = new Date(data.startTime);
+    const endDateTime = new Date(data.endTime);
+    const recurrenceEndDate = existingSeries[0].recurrenceEndDate || formatDateToLocalString(startDateTime);
+    const recurEndDate = new Date(recurrenceEndDate);
     const type = existingSeries[0].recurrenceType || 'daily';
+
+    if (startDateTime >= endDateTime) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '结束时间必须晚于开始时间' };
+    }
+    if (recurEndDate < startDateTime) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '重复结束日期不能早于开始日期' };
+    }
+
+    const startTimeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`;
+    const endTimeStr = `${String(endDateTime.getHours()).padStart(2, '0')}:${String(endDateTime.getMinutes()).padStart(2, '0')}`;
+    const startDateStr = formatDateToLocalString(startDateTime);
 
     const conflictInfos = get().checkRecurrenceConflicts(
       data.roomId,
-      startDate.toISOString().split('T')[0],
+      startDateStr,
       recurrenceEndDate,
       startTimeStr,
       endTimeStr,
-      type
+      type,
+      recurrenceId
     );
 
     const totalCount = conflictInfos.length;
     const conflictCount = conflictInfos.filter((c) => c.hasConflict).length;
+
+    if (totalCount === 0) {
+      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '没有有效的预定日期' };
+    }
 
     if (!skipConflicts && conflictCount > 0) {
       return {
@@ -513,6 +547,10 @@ export const useBookingStore = create<BookingStore>((set, get) => {
 
       updatedBookingsList.push(newBooking);
       index++;
+    }
+
+    if (updatedBookingsList.length === 0) {
+      return { success: false, totalCount, successCount: 0, conflictCount, message: '所有场次都有冲突，无法更新' };
     }
 
     const finalBookings = [...bookingsWithoutOldSeries, ...updatedBookingsList];

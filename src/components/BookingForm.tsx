@@ -64,10 +64,6 @@ export function BookingForm() {
       ...prev,
       date: format(currentDate, 'yyyy-MM-dd'),
     }));
-    if (!recurrenceEndDate) {
-      const defaultEnd = addWeeks(currentDate, 4);
-      setRecurrenceEndDate(format(defaultEnd, 'yyyy-MM-dd'));
-    }
   }, [currentDate]);
 
   useEffect(() => {
