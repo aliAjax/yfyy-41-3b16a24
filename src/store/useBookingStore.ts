@@ -372,9 +372,8 @@ export const useBookingStore = create<BookingStore>((set, get) => {
   },
 
   deleteBooking: (id) => {
-    const { bookings, getRoomById } = get();
+    const { bookings } = get();
     const booking = bookings.find((b) => b.id === id);
-    const room = booking ? getRoomById(booking.roomId) : undefined;
     const updatedBookings = bookings.filter((b) => b.id !== id);
     saveBookingsToStorage(updatedBookings);
     set({ bookings: updatedBookings, selectedBooking: null, isModalOpen: false });
@@ -512,6 +511,28 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     saveBookingsToStorage(updatedBookings);
     set({ bookings: updatedBookings });
 
+    const roomName = room.name;
+    for (const booking of createdBookings) {
+      addBookingChangeLog({
+        bookingId: booking.id,
+        type: 'create',
+        timestamp: now,
+        changes: [
+          { field: 'title', label: '会议主题', oldValue: undefined, newValue: data.title },
+          { field: 'roomId', label: '会议室', oldValue: undefined, newValue: roomName },
+          { field: 'startTime', label: '开始时间', oldValue: undefined, newValue: booking.startTime },
+          { field: 'endTime', label: '结束时间', oldValue: undefined, newValue: booking.endTime },
+          { field: 'department', label: '使用科室', oldValue: undefined, newValue: data.department },
+          { field: 'attendees', label: '参会人数', oldValue: undefined, newValue: data.attendees },
+          { field: 'contact', label: '联系人', oldValue: undefined, newValue: data.contact },
+          { field: 'phone', label: '联系电话', oldValue: undefined, newValue: data.phone },
+          { field: 'remarks', label: '备注', oldValue: undefined, newValue: data.remarks || '' },
+          { field: 'recurrence', label: '重复系列', oldValue: undefined, newValue: recurrenceId },
+        ],
+        description: '新建重复预订',
+      });
+    }
+
     return {
       success: true,
       totalCount,
@@ -534,6 +555,19 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const updatedBookings = bookings.filter((b) => b.recurrenceId !== recurrenceId);
     saveBookingsToStorage(updatedBookings);
     set({ bookings: updatedBookings, selectedBooking: null, isModalOpen: false });
+
+    const now = new Date().toISOString();
+    for (const booking of seriesBookings) {
+      addBookingChangeLog({
+        bookingId: booking.id,
+        type: 'cancel',
+        timestamp: now,
+        changes: [
+          { field: 'status', label: '状态', oldValue: '已预订', newValue: '已取消' },
+        ],
+        description: '取消重复预订系列',
+      });
+    }
 
     return { success: true, deletedCount, message: `成功取消 ${deletedCount} 场重复预定` };
   },
@@ -638,6 +672,56 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const finalBookings = [...bookingsWithoutOldSeries, ...updatedBookingsList];
     saveBookingsToStorage(finalBookings);
     set({ bookings: finalBookings });
+
+    const oldFirstBooking = existingSeries[0];
+    const roomName = room.name;
+    const oldRoom = oldFirstBooking ? getRoomById(oldFirstBooking.roomId) : undefined;
+    const oldRoomName = oldRoom?.name;
+
+    for (let i = 0; i < updatedBookingsList.length; i++) {
+      const newBooking = updatedBookingsList[i];
+      const oldBooking = existingSeries[i];
+
+      const changes: FieldChange[] = [];
+
+      if (oldBooking) {
+        if (oldBooking.title !== data.title) {
+          changes.push({ field: 'title', label: '会议主题', oldValue: oldBooking.title, newValue: data.title });
+        }
+        if (oldBooking.roomId !== data.roomId) {
+          changes.push({ field: 'roomId', label: '会议室', oldValue: oldRoomName, newValue: roomName });
+        }
+        if (oldBooking.startTime !== newBooking.startTime) {
+          changes.push({ field: 'startTime', label: '开始时间', oldValue: oldBooking.startTime, newValue: newBooking.startTime });
+        }
+        if (oldBooking.endTime !== newBooking.endTime) {
+          changes.push({ field: 'endTime', label: '结束时间', oldValue: oldBooking.endTime, newValue: newBooking.endTime });
+        }
+        if (oldBooking.department !== data.department) {
+          changes.push({ field: 'department', label: '使用科室', oldValue: oldBooking.department, newValue: data.department });
+        }
+        if (oldBooking.attendees !== data.attendees) {
+          changes.push({ field: 'attendees', label: '参会人数', oldValue: oldBooking.attendees, newValue: data.attendees });
+        }
+        if (oldBooking.contact !== data.contact) {
+          changes.push({ field: 'contact', label: '联系人', oldValue: oldBooking.contact, newValue: data.contact });
+        }
+        if (oldBooking.phone !== data.phone) {
+          changes.push({ field: 'phone', label: '联系电话', oldValue: oldBooking.phone, newValue: data.phone });
+        }
+        if ((oldBooking.remarks || '') !== (data.remarks || '')) {
+          changes.push({ field: 'remarks', label: '备注', oldValue: oldBooking.remarks || '', newValue: data.remarks || '' });
+        }
+      }
+
+      addBookingChangeLog({
+        bookingId: newBooking.id,
+        type: 'update',
+        timestamp: now,
+        changes,
+        description: '修改重复预订系列',
+      });
+    }
 
     return {
       success: true,

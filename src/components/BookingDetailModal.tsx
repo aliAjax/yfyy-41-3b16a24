@@ -22,7 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { Booking, BookingConflictInfo, BookingChangeLog } from '../types';
+import { Booking, BookingConflictInfo } from '../types';
 import { useBookingStore } from '../store/useBookingStore';
 import { formatDateTime, formatTime, getRecurrenceText } from '../utils/dateUtils';
 import { format } from 'date-fns';

@@ -16,11 +16,9 @@ import {
   Square,
   Phone,
   History,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
-import { MeetingRoom, FacilityType, RoomChangeLog } from '../types';
+import { MeetingRoom, FacilityType } from '../types';
 import { FACILITY_LIST } from '../constants';
 import { format } from 'date-fns';
 
