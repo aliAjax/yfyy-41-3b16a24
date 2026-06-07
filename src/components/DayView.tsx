@@ -1,5 +1,5 @@
 import { useBookingStore } from '../store/useBookingStore';
-import { getBookingsForDate, formatDate, isToday } from '../utils/dateUtils';
+import { getBookingsForDate, formatDate, isToday, computeDefaultEndTime } from '../utils/dateUtils';
 import { BookingCard } from './BookingCard';
 import { BUSINESS_START_HOUR, BUSINESS_END_HOUR, HOUR_HEIGHT } from '../constants';
 import { Booking } from '../types';
@@ -12,7 +12,7 @@ interface DayViewProps {
 }
 
 export function DayView({ date, roomId, onBookingClick, showHeader = false }: DayViewProps) {
-  const { bookings, selectedRoomId, selectedDepartment } = useBookingStore();
+  const { bookings, selectedRoomId, selectedDepartment, setPrefilledFormData } = useBookingStore();
   const actualRoomId = roomId || selectedRoomId;
   
   const dayBookings = getBookingsForDate(bookings, date, actualRoomId).filter((booking) => {
@@ -25,7 +25,25 @@ export function DayView({ date, roomId, onBookingClick, showHeader = false }: Da
     hours.push(h);
   }
 
+  const halfHourSlots = [];
+  for (let h = BUSINESS_START_HOUR; h < BUSINESS_END_HOUR; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      halfHourSlots.push({ hour: h, minute: m });
+    }
+  }
+
   const totalHeight = (BUSINESS_END_HOUR - BUSINESS_START_HOUR) * HOUR_HEIGHT;
+
+  const handleSlotClick = (hour: number, minute: number) => {
+    const startTime = new Date(date);
+    startTime.setHours(hour, minute, 0, 0);
+    const endTime = computeDefaultEndTime(bookings, actualRoomId, date, startTime, 60, BUSINESS_END_HOUR);
+    setPrefilledFormData({
+      roomId: actualRoomId,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+    });
+  };
 
   return (
     <div className="flex flex-col flex-1 min-w-0">
@@ -55,6 +73,17 @@ export function DayView({ date, roomId, onBookingClick, showHeader = false }: Da
           ))}
           
           <div className="absolute left-12 right-0 top-0 bottom-0">
+            {halfHourSlots.map((slot, index) => (
+              <div
+                key={index}
+                className="absolute left-0 right-0 cursor-pointer hover:bg-blue-50/50 transition-colors border-b border-slate-50"
+                style={{
+                  top: `${(slot.hour - BUSINESS_START_HOUR) * HOUR_HEIGHT + (slot.minute / 60) * HOUR_HEIGHT}px`,
+                  height: `${HOUR_HEIGHT / 2}px`,
+                }}
+                onClick={() => handleSlotClick(slot.hour, slot.minute)}
+              />
+            ))}
             {dayBookings.map((booking) => (
               <BookingCard
                 key={booking.id}

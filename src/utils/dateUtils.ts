@@ -75,3 +75,45 @@ export function getMinutesFromTime(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
 }
+
+export function getNextBookingForRoom(
+  bookings: Booking[],
+  roomId: string,
+  date: Date,
+  afterTime: Date
+): Booking | null {
+  const dayBookings = getBookingsForDate(bookings, date, roomId);
+  const upcoming = dayBookings
+    .filter((b) => new Date(b.startTime) >= afterTime)
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  return upcoming[0] || null;
+}
+
+export function computeDefaultEndTime(
+  bookings: Booking[],
+  roomId: string,
+  date: Date,
+  startTime: Date,
+  defaultDurationMinutes: number,
+  businessEndHour: number
+): Date {
+  const defaultEnd = new Date(startTime.getTime() + defaultDurationMinutes * 60 * 1000);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(businessEndHour, 0, 0, 0);
+
+  let endTime = defaultEnd > dayEnd ? dayEnd : defaultEnd;
+
+  const nextBooking = getNextBookingForRoom(bookings, roomId, date, startTime);
+  if (nextBooking) {
+    const nextStart = new Date(nextBooking.startTime);
+    if (nextStart < endTime && nextStart > startTime) {
+      endTime = nextStart;
+    }
+  }
+
+  if (endTime <= startTime) {
+    endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
+  }
+
+  return endTime;
+}
