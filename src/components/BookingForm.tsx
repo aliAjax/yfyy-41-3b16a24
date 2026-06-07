@@ -27,8 +27,13 @@ import {
   deleteTemplateFromStorage,
 } from '../utils/storage';
 import { RecurrenceConflictModal } from './RecurrenceConflictModal';
+import { cn } from '../lib/utils';
 
-export function BookingForm() {
+interface BookingFormProps {
+  embedded?: boolean;
+}
+
+export function BookingForm({ embedded = false }: BookingFormProps) {
   const { selectedRoomId, currentDate, addBooking, checkConflict, prefilledFormData, setPrefilledFormData, getRoomById, getActiveRooms, setSelectedRoomId, addRecurringBookings, checkRecurrenceConflicts } = useBookingStore();
   const activeRooms = getActiveRooms();
   const [formData, setFormData] = useState({
@@ -383,7 +388,14 @@ export function BookingForm() {
   }
 
   return (
-    <div className="w-80 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-full overflow-hidden">
+    <div
+      className={cn(
+        'flex flex-col h-full overflow-hidden',
+        embedded
+          ? 'w-full'
+          : 'w-80 bg-white rounded-2xl shadow-sm border border-slate-100'
+      )}
+    >
       <div className="p-6 pb-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">

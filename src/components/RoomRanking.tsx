@@ -4,7 +4,11 @@ import { useBookingStore } from '../store/useBookingStore';
 import { getRoomWeekStats, formatDurationMinutes } from '../utils/roomStatsUtils';
 import { cn } from '../lib/utils';
 
-export function RoomRanking() {
+interface RoomRankingProps {
+  embedded?: boolean;
+}
+
+export function RoomRanking({ embedded = false }: RoomRankingProps) {
   const { bookings, currentDate, selectedRoomId, setSelectedRoomId, rooms } = useBookingStore();
 
   const roomStats = useMemo(() => {
@@ -19,7 +23,14 @@ export function RoomRanking() {
   };
 
   return (
-    <div className="w-64 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col">
+    <div
+      className={cn(
+        'flex flex-col',
+        embedded
+          ? 'w-full p-4'
+          : 'w-64 bg-white rounded-2xl shadow-sm border border-slate-100 p-4'
+      )}
+    >
       <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
         <div className="w-1 h-5 bg-purple-500 rounded-full"></div>
         会议室使用排行

@@ -22,6 +22,7 @@ import { useBookingStore } from '../store/useBookingStore';
 import { MeetingRoom, RoomRecommendation, AdjacentTimeSlot, CapacityMatchLevel, FacilityType } from '../types';
 import { format } from 'date-fns';
 import { BUSINESS_START_HOUR, BUSINESS_END_HOUR, FACILITY_LIST } from '../constants';
+import { cn } from '../lib/utils';
 
 const getFacilityIcon = (iconName: string) => {
   switch (iconName) {
@@ -38,7 +39,11 @@ const getFacilityIcon = (iconName: string) => {
   }
 };
 
-export function RoomFinder() {
+interface RoomFinderProps {
+  embedded?: boolean;
+}
+
+export function RoomFinder({ embedded = false }: RoomFinderProps) {
   const {
     findAvailableRooms,
     setSelectedRoomId,
@@ -156,7 +161,14 @@ export function RoomFinder() {
   };
 
   return (
-    <div className="w-80 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden max-h-[45vh]">
+    <div
+      className={cn(
+        'flex flex-col overflow-hidden',
+        embedded
+          ? 'w-full h-full'
+          : 'w-80 bg-white rounded-2xl shadow-sm border border-slate-100 max-h-[45vh]'
+      )}
+    >
       <div className="p-6 pb-4">
         <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
           <div className="w-1 h-5 bg-purple-500 rounded-full"></div>

@@ -3,6 +3,7 @@ import { useBookingStore } from '../store/useBookingStore';
 import { getBookingsForDate } from '../utils/dateUtils';
 import { isToday } from 'date-fns';
 import { FACILITY_LIST } from '../constants';
+import { cn } from '../lib/utils';
 
 const getFacilityIcon = (iconName: string) => {
   switch (iconName) {
@@ -19,7 +20,11 @@ const getFacilityIcon = (iconName: string) => {
   }
 };
 
-export function RoomList() {
+interface RoomListProps {
+  embedded?: boolean;
+}
+
+export function RoomList({ embedded = false }: RoomListProps) {
   const { selectedRoomId, setSelectedRoomId, bookings, currentDate, getActiveRooms } = useBookingStore();
   const activeRooms = getActiveRooms();
 
@@ -40,7 +45,14 @@ export function RoomList() {
   };
 
   return (
-    <div className="w-64 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col h-full">
+    <div
+      className={cn(
+        'flex flex-col h-full',
+        embedded
+          ? 'w-full p-4'
+          : 'w-64 bg-white rounded-2xl shadow-sm border border-slate-100 p-4'
+      )}
+    >
       <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
         <div className="w-1 h-5 bg-blue-500 rounded-full"></div>
         会议室列表
