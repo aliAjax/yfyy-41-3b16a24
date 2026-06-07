@@ -15,7 +15,6 @@ import {
   RecurrenceBookingResult,
   BookingChangeLog,
   RoomChangeLog,
-  FieldChange,
 } from '../types';
 import {
   getBookingsFromStorage,
@@ -34,8 +33,28 @@ import {
   addRoomChangeLog,
   getRoomChangeLogsByRoomId,
 } from '../utils/storage';
-import { generateId, hasConflict, generateRecurrenceDates, getRecurrenceBookings, formatDateToLocalString } from '../utils/dateUtils';
+import { generateId, hasConflict, getRecurrenceBookings, formatDateToLocalString } from '../utils/dateUtils';
 import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
+import {
+  buildBookingCreateChanges,
+  buildBookingUpdateChanges,
+  buildRecurrenceBookingUpdateChanges,
+  buildBookingCancelChanges,
+  buildRoomCreateChanges,
+  buildRoomUpdateChanges,
+  buildRoomStatusChanges,
+} from '../utils/changeLogUtils';
+import {
+  validateRecurrenceCreateInput,
+  validateRecurrenceUpdateInput,
+  getTimeStrings,
+  getRecurrenceConflictInfos,
+  buildRecurrenceConflictResult,
+  buildRecurrenceBookings,
+  buildUpdatedRecurrenceBookings,
+  buildRecurrenceSuccessResult,
+  buildRecurrenceErrorResult,
+} from '../utils/recurrenceUtils';
 import {
   ADJACENT_SEARCH_STEP_MINUTES,
   ADJACENT_MAX_SEARCH_STEPS,
@@ -223,17 +242,7 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       bookingId: newBooking.id,
       type: 'create',
       timestamp: new Date().toISOString(),
-      changes: [
-        { field: 'title', label: '会议主题', oldValue: undefined, newValue: data.title },
-        { field: 'roomId', label: '会议室', oldValue: undefined, newValue: room.name },
-        { field: 'startTime', label: '开始时间', oldValue: undefined, newValue: data.startTime },
-        { field: 'endTime', label: '结束时间', oldValue: undefined, newValue: data.endTime },
-        { field: 'department', label: '使用科室', oldValue: undefined, newValue: data.department },
-        { field: 'attendees', label: '参会人数', oldValue: undefined, newValue: data.attendees },
-        { field: 'contact', label: '联系人', oldValue: undefined, newValue: data.contact },
-        { field: 'phone', label: '联系电话', oldValue: undefined, newValue: data.phone },
-        { field: 'remarks', label: '备注', oldValue: undefined, newValue: data.remarks || '' },
-      ],
+      changes: buildBookingCreateChanges(data, room.name),
       description: '新建预订',
     });
 
@@ -276,36 +285,7 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       const updatedBookings = getBookingsFromStorage();
       set({ bookings: updatedBookings, selectedBooking: updatedBooking });
 
-      const changes: FieldChange[] = [];
-      if (oldBooking) {
-        if (oldBooking.title !== data.title) {
-          changes.push({ field: 'title', label: '会议主题', oldValue: oldBooking.title, newValue: data.title });
-        }
-        if (oldBooking.roomId !== data.roomId) {
-          changes.push({ field: 'roomId', label: '会议室', oldValue: oldRoom?.name, newValue: room.name });
-        }
-        if (oldBooking.startTime !== data.startTime) {
-          changes.push({ field: 'startTime', label: '开始时间', oldValue: oldBooking.startTime, newValue: data.startTime });
-        }
-        if (oldBooking.endTime !== data.endTime) {
-          changes.push({ field: 'endTime', label: '结束时间', oldValue: oldBooking.endTime, newValue: data.endTime });
-        }
-        if (oldBooking.department !== data.department) {
-          changes.push({ field: 'department', label: '使用科室', oldValue: oldBooking.department, newValue: data.department });
-        }
-        if (oldBooking.attendees !== data.attendees) {
-          changes.push({ field: 'attendees', label: '参会人数', oldValue: oldBooking.attendees, newValue: data.attendees });
-        }
-        if (oldBooking.contact !== data.contact) {
-          changes.push({ field: 'contact', label: '联系人', oldValue: oldBooking.contact, newValue: data.contact });
-        }
-        if (oldBooking.phone !== data.phone) {
-          changes.push({ field: 'phone', label: '联系电话', oldValue: oldBooking.phone, newValue: data.phone });
-        }
-        if ((oldBooking.remarks || '') !== (data.remarks || '')) {
-          changes.push({ field: 'remarks', label: '备注', oldValue: oldBooking.remarks || '', newValue: data.remarks || '' });
-        }
-      }
+      const changes = buildBookingUpdateChanges(oldBooking, data, oldRoom?.name, room.name);
 
       addBookingChangeLog({
         bookingId: id,
@@ -383,9 +363,7 @@ export const useBookingStore = create<BookingStore>((set, get) => {
         bookingId: id,
         type: 'cancel',
         timestamp: new Date().toISOString(),
-        changes: [
-          { field: 'status', label: '状态', oldValue: '已预订', newValue: '已取消' },
-        ],
+        changes: buildBookingCancelChanges(),
         description: '取消预订',
       });
     }
@@ -393,32 +371,16 @@ export const useBookingStore = create<BookingStore>((set, get) => {
 
   checkRecurrenceConflicts: (roomId, startDate, endDate, startTime, endTime, type, excludeRecurrenceId) => {
     const { bookings } = get();
-    const start = new Date(`${startDate}T00:00:00`);
-    const end = new Date(`${endDate}T23:59:59`);
-
-    const dates = generateRecurrenceDates(start, end, type);
-
-    return dates.map((date) => {
-      const dateStr = formatDateToLocalString(date);
-      const startDateTime = new Date(`${dateStr}T${startTime}:00`);
-      const endDateTime = new Date(`${dateStr}T${endTime}:00`);
-
-      const conflictBooking = bookings.find((b) => {
-        if (b.roomId !== roomId) return false;
-        if (excludeRecurrenceId && b.recurrenceId === excludeRecurrenceId) return false;
-        const bStart = new Date(b.startTime);
-        const bEnd = new Date(b.endTime);
-        return startDateTime < bEnd && endDateTime > bStart;
-      });
-
-      return {
-        date: dateStr,
-        startTime,
-        endTime,
-        hasConflict: !!conflictBooking,
-        conflictWith: conflictBooking,
-      };
-    });
+    return getRecurrenceConflictInfos(
+      bookings,
+      roomId,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      type,
+      excludeRecurrenceId
+    );
   },
 
   addRecurringBookings: (data, type, recurrenceEndDate, skipConflicts = false) => {
@@ -428,26 +390,14 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const startDateStr = formatDateToLocalString(startDateTime);
     const room = getRoomById(data.roomId);
 
-    if (!room) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '会议室不存在' };
-    }
-    if (room.status === 'inactive') {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '该会议室已停用，无法新建预定' };
-    }
-    if (data.attendees > room.capacity) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: `参会人数超出会议室容量（最多${room.capacity}人）` };
-    }
-    if (startDateTime >= endDateTime) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '结束时间必须晚于开始时间' };
-    }
-    if (recurrenceEndDate < startDateStr) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '重复结束日期不能早于开始日期' };
+    const validation = validateRecurrenceCreateInput(data, room, recurrenceEndDate);
+    if (!validation.valid) {
+      return buildRecurrenceErrorResult(0, 0, validation.message);
     }
 
-    const startTimeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`;
-    const endTimeStr = `${String(endDateTime.getHours()).padStart(2, '0')}:${String(endDateTime.getMinutes()).padStart(2, '0')}`;
-
-    const conflictInfos = get().checkRecurrenceConflicts(
+    const { startTimeStr, endTimeStr } = getTimeStrings(startDateTime, endDateTime);
+    const conflictInfos = getRecurrenceConflictInfos(
+      bookings,
       data.roomId,
       startDateStr,
       recurrenceEndDate,
@@ -456,91 +406,50 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       type
     );
 
-    const totalCount = conflictInfos.length;
-    const conflictCount = conflictInfos.filter((c) => c.hasConflict).length;
-
-    if (totalCount === 0) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '没有有效的预定日期' };
-    }
-
-    if (!skipConflicts && conflictCount > 0) {
-      return {
-        success: false,
-        totalCount,
-        successCount: 0,
-        conflictCount,
-        message: `共 ${totalCount} 场预定，其中 ${conflictCount} 场存在冲突`,
-      };
+    const conflictResult = buildRecurrenceConflictResult(conflictInfos, skipConflicts);
+    if (!conflictResult.canProceed) {
+      return buildRecurrenceErrorResult(conflictResult.totalCount, conflictResult.conflictCount, conflictResult.message);
     }
 
     const recurrenceId = `rec-${generateId()}`;
     const now = new Date().toISOString();
-    let index = 0;
-    const createdBookings: Booking[] = [];
-
-    for (const info of conflictInfos) {
-      if (info.hasConflict && skipConflicts) continue;
-
-      const newBooking: Booking = {
-        id: generateId(),
-        roomId: data.roomId,
-        title: data.title,
-        department: data.department,
-        attendees: data.attendees,
-        startTime: `${info.date}T${info.startTime}:00`,
-        endTime: `${info.date}T${info.endTime}:00`,
-        contact: data.contact,
-        phone: data.phone,
-        remarks: data.remarks,
-        createdAt: now,
-        recurrenceId,
-        recurrenceType: type,
-        recurrenceEndDate,
-        recurrenceIndex: index,
-      };
-
-      createdBookings.push(newBooking);
-      index++;
-    }
+    const createdBookings = buildRecurrenceBookings(
+      data,
+      conflictInfos,
+      type,
+      recurrenceEndDate,
+      recurrenceId,
+      now,
+      skipConflicts
+    );
 
     if (createdBookings.length === 0) {
-      return { success: false, totalCount, successCount: 0, conflictCount, message: '所有场次都有冲突，无法创建' };
+      return buildRecurrenceErrorResult(conflictResult.totalCount, conflictResult.conflictCount, '所有场次都有冲突，无法创建');
     }
 
     const updatedBookings = [...bookings, ...createdBookings];
     saveBookingsToStorage(updatedBookings);
     set({ bookings: updatedBookings });
 
-    const roomName = room.name;
+    const roomName = room!.name;
     for (const booking of createdBookings) {
       addBookingChangeLog({
         bookingId: booking.id,
         type: 'create',
         timestamp: now,
-        changes: [
-          { field: 'title', label: '会议主题', oldValue: undefined, newValue: data.title },
-          { field: 'roomId', label: '会议室', oldValue: undefined, newValue: roomName },
-          { field: 'startTime', label: '开始时间', oldValue: undefined, newValue: booking.startTime },
-          { field: 'endTime', label: '结束时间', oldValue: undefined, newValue: booking.endTime },
-          { field: 'department', label: '使用科室', oldValue: undefined, newValue: data.department },
-          { field: 'attendees', label: '参会人数', oldValue: undefined, newValue: data.attendees },
-          { field: 'contact', label: '联系人', oldValue: undefined, newValue: data.contact },
-          { field: 'phone', label: '联系电话', oldValue: undefined, newValue: data.phone },
-          { field: 'remarks', label: '备注', oldValue: undefined, newValue: data.remarks || '' },
-          { field: 'recurrence', label: '重复系列', oldValue: undefined, newValue: recurrenceId },
-        ],
+        changes: buildBookingCreateChanges(data, roomName, recurrenceId),
         description: '新建重复预订',
       });
     }
 
-    return {
-      success: true,
-      totalCount,
-      successCount: createdBookings.length,
-      conflictCount,
-      message: `成功创建 ${createdBookings.length} 场重复预定${skipConflicts && conflictCount > 0 ? `（跳过 ${conflictCount} 场冲突）` : ''}`,
+    return buildRecurrenceSuccessResult(
+      conflictResult.totalCount,
+      createdBookings.length,
+      conflictResult.conflictCount,
       createdBookings,
-    };
+      skipConflicts,
+      'create'
+    );
   },
 
   deleteRecurrenceSeries: (recurrenceId) => {
@@ -562,9 +471,7 @@ export const useBookingStore = create<BookingStore>((set, get) => {
         bookingId: booking.id,
         type: 'cancel',
         timestamp: now,
-        changes: [
-          { field: 'status', label: '状态', oldValue: '已预订', newValue: '已取消' },
-        ],
+        changes: buildBookingCancelChanges(),
         description: '取消重复预订系列',
       });
     }
@@ -576,38 +483,20 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const { bookings, getRoomById } = get();
     const room = getRoomById(data.roomId);
     const existingSeries = bookings.filter((b) => b.recurrenceId === recurrenceId);
-
-    if (existingSeries.length === 0) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '未找到重复预订系列' };
-    }
-
-    if (!room) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '会议室不存在' };
-    }
-    if (room.status === 'inactive') {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '该会议室已停用' };
-    }
-    if (data.attendees > room.capacity) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: `参会人数超出会议室容量（最多${room.capacity}人）` };
-    }
-
+    const type = existingSeries[0]?.recurrenceType || 'daily';
     const startDateTime = new Date(data.startTime);
     const endDateTime = new Date(data.endTime);
-    const recurrenceEndDate = existingSeries[0].recurrenceEndDate || formatDateToLocalString(startDateTime);
+    const recurrenceEndDate = existingSeries[0]?.recurrenceEndDate || formatDateToLocalString(startDateTime);
+
+    const validation = validateRecurrenceUpdateInput(data, room, existingSeries, recurrenceEndDate);
+    if (!validation.valid) {
+      return buildRecurrenceErrorResult(0, 0, validation.message);
+    }
+
     const startDateStr = formatDateToLocalString(startDateTime);
-    const type = existingSeries[0].recurrenceType || 'daily';
-
-    if (startDateTime >= endDateTime) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '结束时间必须晚于开始时间' };
-    }
-    if (recurrenceEndDate < startDateStr) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '重复结束日期不能早于开始日期' };
-    }
-
-    const startTimeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`;
-    const endTimeStr = `${String(endDateTime.getHours()).padStart(2, '0')}:${String(endDateTime.getMinutes()).padStart(2, '0')}`;
-
-    const conflictInfos = get().checkRecurrenceConflicts(
+    const { startTimeStr, endTimeStr } = getTimeStrings(startDateTime, endDateTime);
+    const conflictInfos = getRecurrenceConflictInfos(
+      bookings,
       data.roomId,
       startDateStr,
       recurrenceEndDate,
@@ -617,64 +506,34 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       recurrenceId
     );
 
-    const totalCount = conflictInfos.length;
-    const conflictCount = conflictInfos.filter((c) => c.hasConflict).length;
-
-    if (totalCount === 0) {
-      return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '没有有效的预定日期' };
-    }
-
-    if (!skipConflicts && conflictCount > 0) {
-      return {
-        success: false,
-        totalCount,
-        successCount: 0,
-        conflictCount,
-        message: `共 ${totalCount} 场预定，其中 ${conflictCount} 场存在冲突`,
-      };
+    const conflictResult = buildRecurrenceConflictResult(conflictInfos, skipConflicts);
+    if (!conflictResult.canProceed) {
+      return buildRecurrenceErrorResult(conflictResult.totalCount, conflictResult.conflictCount, conflictResult.message);
     }
 
     const now = new Date().toISOString();
-    let index = 0;
-    const updatedBookingsList: Booking[] = [];
-    const bookingsWithoutOldSeries = bookings.filter((b) => b.recurrenceId !== recurrenceId);
-
-    for (const info of conflictInfos) {
-      if (info.hasConflict && skipConflicts) continue;
-
-      const existingBooking = existingSeries[index];
-      const newBooking: Booking = {
-        id: existingBooking ? existingBooking.id : generateId(),
-        roomId: data.roomId,
-        title: data.title,
-        department: data.department,
-        attendees: data.attendees,
-        startTime: `${info.date}T${info.startTime}:00`,
-        endTime: `${info.date}T${info.endTime}:00`,
-        contact: data.contact,
-        phone: data.phone,
-        remarks: data.remarks,
-        createdAt: existingBooking ? existingBooking.createdAt : now,
-        recurrenceId,
-        recurrenceType: type,
-        recurrenceEndDate,
-        recurrenceIndex: index,
-      };
-
-      updatedBookingsList.push(newBooking);
-      index++;
-    }
+    const updatedBookingsList = buildUpdatedRecurrenceBookings(
+      data,
+      conflictInfos,
+      type,
+      recurrenceEndDate,
+      recurrenceId,
+      now,
+      existingSeries,
+      skipConflicts
+    );
 
     if (updatedBookingsList.length === 0) {
-      return { success: false, totalCount, successCount: 0, conflictCount, message: '所有场次都有冲突，无法更新' };
+      return buildRecurrenceErrorResult(conflictResult.totalCount, conflictResult.conflictCount, '所有场次都有冲突，无法更新');
     }
 
+    const bookingsWithoutOldSeries = bookings.filter((b) => b.recurrenceId !== recurrenceId);
     const finalBookings = [...bookingsWithoutOldSeries, ...updatedBookingsList];
     saveBookingsToStorage(finalBookings);
     set({ bookings: finalBookings });
 
     const oldFirstBooking = existingSeries[0];
-    const roomName = room.name;
+    const roomName = room!.name;
     const oldRoom = oldFirstBooking ? getRoomById(oldFirstBooking.roomId) : undefined;
     const oldRoomName = oldRoom?.name;
 
@@ -682,37 +541,14 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       const newBooking = updatedBookingsList[i];
       const oldBooking = existingSeries[i];
 
-      const changes: FieldChange[] = [];
-
-      if (oldBooking) {
-        if (oldBooking.title !== data.title) {
-          changes.push({ field: 'title', label: '会议主题', oldValue: oldBooking.title, newValue: data.title });
-        }
-        if (oldBooking.roomId !== data.roomId) {
-          changes.push({ field: 'roomId', label: '会议室', oldValue: oldRoomName, newValue: roomName });
-        }
-        if (oldBooking.startTime !== newBooking.startTime) {
-          changes.push({ field: 'startTime', label: '开始时间', oldValue: oldBooking.startTime, newValue: newBooking.startTime });
-        }
-        if (oldBooking.endTime !== newBooking.endTime) {
-          changes.push({ field: 'endTime', label: '结束时间', oldValue: oldBooking.endTime, newValue: newBooking.endTime });
-        }
-        if (oldBooking.department !== data.department) {
-          changes.push({ field: 'department', label: '使用科室', oldValue: oldBooking.department, newValue: data.department });
-        }
-        if (oldBooking.attendees !== data.attendees) {
-          changes.push({ field: 'attendees', label: '参会人数', oldValue: oldBooking.attendees, newValue: data.attendees });
-        }
-        if (oldBooking.contact !== data.contact) {
-          changes.push({ field: 'contact', label: '联系人', oldValue: oldBooking.contact, newValue: data.contact });
-        }
-        if (oldBooking.phone !== data.phone) {
-          changes.push({ field: 'phone', label: '联系电话', oldValue: oldBooking.phone, newValue: data.phone });
-        }
-        if ((oldBooking.remarks || '') !== (data.remarks || '')) {
-          changes.push({ field: 'remarks', label: '备注', oldValue: oldBooking.remarks || '', newValue: data.remarks || '' });
-        }
-      }
+      const changes = buildRecurrenceBookingUpdateChanges(
+        oldBooking,
+        data,
+        newBooking.startTime,
+        newBooking.endTime,
+        oldRoomName,
+        roomName
+      );
 
       addBookingChangeLog({
         bookingId: newBooking.id,
@@ -723,14 +559,14 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       });
     }
 
-    return {
-      success: true,
-      totalCount,
-      successCount: updatedBookingsList.length,
-      conflictCount,
-      message: `成功更新 ${updatedBookingsList.length} 场重复预定${skipConflicts && conflictCount > 0 ? `（跳过 ${conflictCount} 场冲突）` : ''}`,
-      createdBookings: updatedBookingsList,
-    };
+    return buildRecurrenceSuccessResult(
+      conflictResult.totalCount,
+      updatedBookingsList.length,
+      conflictResult.conflictCount,
+      updatedBookingsList,
+      skipConflicts,
+      'update'
+    );
   },
 
   getRecurrenceBookings: (recurrenceId) => {
@@ -871,13 +707,7 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       roomId: newRoom.id,
       type: 'create',
       timestamp: new Date().toISOString(),
-      changes: [
-        { field: 'name', label: '会议室名称', oldValue: undefined, newValue: room.name },
-        { field: 'capacity', label: '容量', oldValue: undefined, newValue: room.capacity },
-        { field: 'location', label: '位置', oldValue: undefined, newValue: room.location },
-        { field: 'color', label: '标识颜色', oldValue: undefined, newValue: room.color },
-        { field: 'facilities', label: '设备标签', oldValue: undefined, newValue: room.facilities },
-      ],
+      changes: buildRoomCreateChanges(room),
       description: '新增会议室',
     });
 
@@ -892,24 +722,7 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       const rooms = getRoomsFromStorage();
       set({ rooms });
 
-      const changes: FieldChange[] = [];
-      if (oldRoom) {
-        if (updates.name !== undefined && oldRoom.name !== updates.name) {
-          changes.push({ field: 'name', label: '会议室名称', oldValue: oldRoom.name, newValue: updates.name });
-        }
-        if (updates.capacity !== undefined && oldRoom.capacity !== updates.capacity) {
-          changes.push({ field: 'capacity', label: '容量', oldValue: oldRoom.capacity, newValue: updates.capacity });
-        }
-        if (updates.location !== undefined && oldRoom.location !== updates.location) {
-          changes.push({ field: 'location', label: '位置', oldValue: oldRoom.location, newValue: updates.location });
-        }
-        if (updates.color !== undefined && oldRoom.color !== updates.color) {
-          changes.push({ field: 'color', label: '标识颜色', oldValue: oldRoom.color, newValue: updates.color });
-        }
-        if (updates.facilities !== undefined && JSON.stringify(oldRoom.facilities) !== JSON.stringify(updates.facilities)) {
-          changes.push({ field: 'facilities', label: '设备标签', oldValue: oldRoom.facilities, newValue: updates.facilities });
-        }
-      }
+      const changes = buildRoomUpdateChanges(oldRoom, updates);
 
       addRoomChangeLog({
         roomId: id,
@@ -942,14 +755,7 @@ export const useBookingStore = create<BookingStore>((set, get) => {
         roomId: id,
         type: isActivating ? 'activate' : 'deactivate',
         timestamp: new Date().toISOString(),
-        changes: [
-          {
-            field: 'status',
-            label: '状态',
-            oldValue: oldRoom?.status === 'active' ? '启用' : '停用',
-            newValue: isActivating ? '启用' : '停用',
-          },
-        ],
+        changes: buildRoomStatusChanges(oldRoom?.status, isActivating),
         description: isActivating ? '启用会议室' : '停用会议室',
       });
     }
