@@ -31,6 +31,27 @@ export function buildBookingCreateChanges(
   return changes;
 }
 
+export function buildRecurrenceBookingCreateChanges(
+  data: BookingFormData,
+  roomName: string,
+  startTime: string,
+  endTime: string,
+  recurrenceId: string
+): FieldChange[] {
+  return [
+    { field: 'title', label: '会议主题', oldValue: undefined, newValue: data.title },
+    { field: 'roomId', label: '会议室', oldValue: undefined, newValue: roomName },
+    { field: 'startTime', label: '开始时间', oldValue: undefined, newValue: startTime },
+    { field: 'endTime', label: '结束时间', oldValue: undefined, newValue: endTime },
+    { field: 'department', label: '使用科室', oldValue: undefined, newValue: data.department },
+    { field: 'attendees', label: '参会人数', oldValue: undefined, newValue: data.attendees },
+    { field: 'contact', label: '联系人', oldValue: undefined, newValue: data.contact },
+    { field: 'phone', label: '联系电话', oldValue: undefined, newValue: data.phone },
+    { field: 'remarks', label: '备注', oldValue: undefined, newValue: data.remarks || '' },
+    { field: 'recurrence', label: '重复系列', oldValue: undefined, newValue: recurrenceId },
+  ];
+}
+
 export function buildBookingUpdateChanges(
   oldBooking: Booking | undefined,
   data: BookingFormData,

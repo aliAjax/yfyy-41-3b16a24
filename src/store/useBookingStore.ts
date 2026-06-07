@@ -37,6 +37,7 @@ import { generateId, hasConflict, getRecurrenceBookings, formatDateToLocalString
 import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
 import {
   buildBookingCreateChanges,
+  buildRecurrenceBookingCreateChanges,
   buildBookingUpdateChanges,
   buildRecurrenceBookingUpdateChanges,
   buildBookingCancelChanges,
@@ -437,7 +438,13 @@ export const useBookingStore = create<BookingStore>((set, get) => {
         bookingId: booking.id,
         type: 'create',
         timestamp: now,
-        changes: buildBookingCreateChanges(data, roomName, recurrenceId),
+        changes: buildRecurrenceBookingCreateChanges(
+          data,
+          roomName,
+          booking.startTime,
+          booking.endTime,
+          recurrenceId
+        ),
         description: '新建重复预订',
       });
     }
