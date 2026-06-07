@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "check": "tsc -b --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify": "npm run check && npm run lint && npm run build && npm run test"
   },
   "dependencies": {
     "clsx": "^2.1.1",
