@@ -341,7 +341,7 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const { bookings, getRoomById } = get();
     const startDateTime = new Date(data.startTime);
     const endDateTime = new Date(data.endTime);
-    const recurEndDate = new Date(recurrenceEndDate);
+    const startDateStr = formatDateToLocalString(startDateTime);
     const room = getRoomById(data.roomId);
 
     if (!room) {
@@ -356,14 +356,12 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     if (startDateTime >= endDateTime) {
       return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '结束时间必须晚于开始时间' };
     }
-    if (recurEndDate < startDateTime) {
+    if (recurrenceEndDate < startDateStr) {
       return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '重复结束日期不能早于开始日期' };
     }
 
     const startTimeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`;
     const endTimeStr = `${String(endDateTime.getHours()).padStart(2, '0')}:${String(endDateTime.getMinutes()).padStart(2, '0')}`;
-
-    const startDateStr = formatDateToLocalString(startDateTime);
 
     const conflictInfos = get().checkRecurrenceConflicts(
       data.roomId,
@@ -477,19 +475,18 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const startDateTime = new Date(data.startTime);
     const endDateTime = new Date(data.endTime);
     const recurrenceEndDate = existingSeries[0].recurrenceEndDate || formatDateToLocalString(startDateTime);
-    const recurEndDate = new Date(recurrenceEndDate);
+    const startDateStr = formatDateToLocalString(startDateTime);
     const type = existingSeries[0].recurrenceType || 'daily';
 
     if (startDateTime >= endDateTime) {
       return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '结束时间必须晚于开始时间' };
     }
-    if (recurEndDate < startDateTime) {
+    if (recurrenceEndDate < startDateStr) {
       return { success: false, totalCount: 0, successCount: 0, conflictCount: 0, message: '重复结束日期不能早于开始日期' };
     }
 
     const startTimeStr = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`;
     const endTimeStr = `${String(endDateTime.getHours()).padStart(2, '0')}:${String(endDateTime.getMinutes()).padStart(2, '0')}`;
-    const startDateStr = formatDateToLocalString(startDateTime);
 
     const conflictInfos = get().checkRecurrenceConflicts(
       data.roomId,
