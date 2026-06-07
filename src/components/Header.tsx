@@ -62,7 +62,7 @@ export function Header() {
           </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden lg:flex items-center gap-4">
           <div className="flex items-center gap-2 bg-slate-700/50 rounded-lg p-1">
             <button
               onClick={() => setViewMode('day')}
@@ -133,14 +133,14 @@ export function Header() {
 
         <button
           onClick={() => setShowMobileMenu(!showMobileMenu)}
-          className="md:hidden p-2 rounded-lg hover:bg-slate-700/50 transition-colors"
+          className="lg:hidden p-2 rounded-lg hover:bg-slate-700/50 transition-colors"
         >
           {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
       <div
-        className={`md:hidden absolute top-full left-0 right-0 bg-slate-800 border-t border-slate-700 shadow-lg overflow-hidden transition-all duration-300 ${
+        className={`lg:hidden absolute top-full left-0 right-0 bg-slate-800 border-t border-slate-700 shadow-lg overflow-hidden transition-all duration-300 ${
           showMobileMenu ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
         }`}
       >

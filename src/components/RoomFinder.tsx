@@ -166,7 +166,7 @@ export function RoomFinder({ embedded = false }: RoomFinderProps) {
         'flex flex-col overflow-hidden',
         embedded
           ? 'w-full h-full'
-          : 'w-full min-w-0 bg-white rounded-2xl shadow-sm border border-slate-100 max-h-[45vh]'
+          : 'w-full min-w-0 bg-white rounded-2xl shadow-sm border border-slate-100 max-h-[30vh]'
       )}
     >
       <div className="p-4 md:p-6 pb-3 md:pb-4">

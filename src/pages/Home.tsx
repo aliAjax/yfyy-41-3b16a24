@@ -48,13 +48,13 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col overflow-hidden">
       <Header />
 
       <main className="flex-1 p-3 sm:p-4 md:p-6 min-h-0 overflow-hidden w-full pb-20 md:pb-0">
-        <div className="h-full w-full flex flex-col gap-3 sm:gap-4 md:gap-6 min-w-0">
+        <div className="h-full w-full flex flex-col gap-3 sm:gap-4 md:gap-5 min-w-0">
           <div className="hidden md:block" style={{ animation: 'fadeIn 0.4s ease-out' }}>
-            <TodayOverview />
+            <TodayOverview compact />
           </div>
 
           <div className="md:hidden">
@@ -76,9 +76,9 @@ export default function Home() {
             )}
           </div>
 
-          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[200px_1fr_260px] lg:grid-cols-[240px_1fr_300px] xl:grid-cols-[256px_1fr_320px] gap-3 sm:gap-4 md:gap-5 lg:gap-6 min-w-0">
+          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[156px_minmax(0,1fr)_220px] lg:grid-cols-[200px_minmax(0,1fr)_260px] xl:grid-cols-[220px_minmax(0,1fr)_280px] 2xl:grid-cols-[240px_minmax(0,1fr)_300px] gap-3 sm:gap-4 lg:gap-5 min-w-0">
             <div
-              className="hidden md:flex h-full flex-col gap-3 md:gap-4 min-h-0"
+              className="hidden md:flex h-full flex-col gap-3 md:gap-4 min-h-0 overflow-hidden"
               style={{ animation: 'slideInLeft 0.5s ease-out' }}
             >
               <div className="flex-shrink-0">
@@ -90,14 +90,14 @@ export default function Home() {
             </div>
 
             <div
-              className="h-full min-w-0 w-full col-span-1 md:col-span-1"
+              className="h-full min-h-0 min-w-0 w-full col-span-1 md:col-span-1 overflow-hidden"
               style={{ animation: 'fadeIn 0.6s ease-out' }}
             >
               <CalendarView onBookingClick={handleBookingClick} />
             </div>
 
             <div
-              className="hidden xl:flex h-full flex-col gap-3 md:gap-4 min-h-0"
+              className="hidden xl:flex h-full flex-col gap-3 md:gap-4 min-h-0 overflow-hidden"
               style={{ animation: 'slideInRight 0.5s ease-out' }}
             >
               <div className="flex-shrink-0">
@@ -109,7 +109,7 @@ export default function Home() {
             </div>
 
             <div
-              className="hidden md:block xl:hidden h-full min-h-0"
+              className="hidden md:block xl:hidden h-full min-h-0 overflow-hidden"
               style={{ animation: 'slideInRight 0.5s ease-out' }}
             >
               <RightPanel defaultTab="form" />

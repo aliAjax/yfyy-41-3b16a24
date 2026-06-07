@@ -35,7 +35,11 @@ const getFacilityIcon = (iconName: string) => {
   }
 };
 
-export function TodayOverview() {
+interface TodayOverviewProps {
+  compact?: boolean;
+}
+
+export function TodayOverview({ compact = false }: TodayOverviewProps) {
   const { bookings, currentDate, setSelectedBooking, setIsModalOpen, setSelectedRoomId, setCurrentDate, getActiveRooms, getRoomById } = useBookingStore();
   const activeRooms = getActiveRooms();
   const [now, setNow] = useState(new Date());
@@ -67,6 +71,61 @@ export function TodayOverview() {
   };
 
   const nextMeeting = overviewData.upcomingMeetings[0];
+
+  if (compact) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2 flex-shrink-0">
+            <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
+            {isToday ? '今日总览' : `${formatDate(currentDate, 'MM月dd日')} 总览`}
+          </h2>
+          {!isToday && (
+            <button
+              onClick={handleJumpToToday}
+              className="text-xs px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors font-medium flex-shrink-0"
+            >
+              回到今天
+            </button>
+          )}
+          <div className="grid grid-cols-4 gap-2 flex-1 min-w-0">
+            <div className="rounded-xl bg-blue-50 px-3 py-2 min-w-0">
+              <div className="flex items-center gap-1.5 text-xs text-blue-600 font-medium">
+                <CalendarCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">今日预定</span>
+              </div>
+              <p className="text-xl font-bold text-blue-700 leading-tight">{overviewData.totalBookings}</p>
+            </div>
+            <div className="rounded-xl bg-red-50 px-3 py-2 min-w-0">
+              <div className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
+                <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">进行中</span>
+              </div>
+              <p className="text-xl font-bold text-red-700 leading-tight">
+                {isToday ? overviewData.activeMeetings.length : '-'}
+              </p>
+            </div>
+            <div className="rounded-xl bg-green-50 px-3 py-2 min-w-0">
+              <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                <DoorOpen className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">空闲会议室</span>
+              </div>
+              <p className="text-xl font-bold text-green-700 leading-tight">
+                {isToday ? overviewData.freeRoomCount : '-'}
+              </p>
+            </div>
+            <div className="rounded-xl bg-amber-50 px-3 py-2 min-w-0">
+              <div className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+                <Users className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">会议室总数</span>
+              </div>
+              <p className="text-xl font-bold text-amber-700 leading-tight">{activeRooms.length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
