@@ -15,10 +15,14 @@ import {
   Video,
   Square,
   Phone,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useBookingStore } from '../store/useBookingStore';
-import { MeetingRoom, FacilityType } from '../types';
+import { MeetingRoom, FacilityType, RoomChangeLog } from '../types';
 import { FACILITY_LIST } from '../constants';
+import { format } from 'date-fns';
 
 const COLOR_PRESETS = [
   '#3b82f6',
@@ -61,6 +65,7 @@ export function RoomManagementModal() {
     hasBookingsForRoom,
     selectedRoomId,
     setSelectedRoomId,
+    getRoomChangeLogs,
   } = useBookingStore();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -69,6 +74,7 @@ export function RoomManagementModal() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isRoomManagementModalOpen) {
@@ -509,6 +515,17 @@ export function RoomManagementModal() {
 
                         <div className="flex items-center gap-1">
                           <button
+                            onClick={() => setExpandedRoomId(expandedRoomId === room.id ? null : room.id)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              expandedRoomId === room.id
+                                ? 'text-blue-500 bg-blue-50'
+                                : 'text-slate-400 hover:text-blue-500 hover:bg-blue-50'
+                            }`}
+                            title="变更记录"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleStartEdit(room)}
                             className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                             title="编辑"
@@ -540,6 +557,126 @@ export function RoomManagementModal() {
                           </button>
                         </div>
                       </div>
+
+                      {expandedRoomId === room.id && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <p className="text-xs font-medium text-slate-600 mb-2 flex items-center gap-1.5">
+                            <History className="w-3.5 h-3.5" />
+                            变更记录
+                          </p>
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {getRoomChangeLogs(room.id).length === 0 ? (
+                              <p className="text-xs text-slate-400 text-center py-3">暂无变更记录</p>
+                            ) : (
+                              getRoomChangeLogs(room.id).map((log) => (
+                                <div
+                                  key={log.id}
+                                  className="p-2.5 bg-slate-50 rounded-lg text-xs"
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span
+                                      className={`font-medium px-2 py-0.5 rounded-full ${
+                                        log.type === 'create'
+                                          ? 'bg-green-100 text-green-700'
+                                          : log.type === 'update'
+                                          ? 'bg-blue-100 text-blue-700'
+                                          : log.type === 'activate'
+                                          ? 'bg-emerald-100 text-emerald-700'
+                                          : 'bg-amber-100 text-amber-700'
+                                      }`}
+                                    >
+                                      {log.type === 'create'
+                                        ? '新增'
+                                        : log.type === 'update'
+                                        ? '编辑'
+                                        : log.type === 'activate'
+                                        ? '启用'
+                                        : '停用'}
+                                    </span>
+                                    <span className="text-slate-400">
+                                      {format(new Date(log.timestamp), 'MM-dd HH:mm')}
+                                    </span>
+                                  </div>
+                                  <p className="text-slate-600 mb-1">{log.description}</p>
+                                  {log.changes.length > 0 && (
+                                    <div className="space-y-0.5">
+                                      {log.changes.map((change, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="text-slate-500 flex items-start gap-1"
+                                        >
+                                          <span className="text-slate-300">•</span>
+                                          <span>
+                                            <span className="text-slate-500">{change.label}：</span>
+                                            {log.type === 'create' ? (
+                                              <span className="text-green-600">
+                                                {Array.isArray(change.newValue)
+                                                  ? (change.newValue as string[]).length > 0
+                                                    ? (change.newValue as string[])
+                                                        .map((f) => {
+                                                          const facility = FACILITY_LIST.find(
+                                                            (fa) => fa.type === f
+                                                          );
+                                                          return facility?.label || f;
+                                                        })
+                                                        .join('、')
+                                                    : '无'
+                                                  : change.newValue}
+                                              </span>
+                                            ) : log.type === 'activate' || log.type === 'deactivate' ? (
+                                              <span
+                                                className={
+                                                  log.type === 'activate'
+                                                    ? 'text-green-600'
+                                                    : 'text-amber-600'
+                                                }
+                                              >
+                                                {String(change.newValue)}
+                                              </span>
+                                            ) : (
+                                              <>
+                                                <span className="text-slate-400 line-through">
+                                                  {Array.isArray(change.oldValue)
+                                                    ? (change.oldValue as string[]).length > 0
+                                                      ? (change.oldValue as string[])
+                                                          .map((f) => {
+                                                            const facility = FACILITY_LIST.find(
+                                                              (fa) => fa.type === f
+                                                            );
+                                                            return facility?.label || f;
+                                                          })
+                                                          .join('、')
+                                                      : '无'
+                                                    : change.oldValue}
+                                                </span>
+                                                <span className="mx-1 text-slate-300">→</span>
+                                                <span className="text-blue-600">
+                                                  {Array.isArray(change.newValue)
+                                                    ? (change.newValue as string[]).length > 0
+                                                      ? (change.newValue as string[])
+                                                          .map((f) => {
+                                                            const facility = FACILITY_LIST.find(
+                                                              (fa) => fa.type === f
+                                                            );
+                                                            return facility?.label || f;
+                                                          })
+                                                          .join('、')
+                                                      : '无'
+                                                    : change.newValue}
+                                                </span>
+                                              </>
+                                            )}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

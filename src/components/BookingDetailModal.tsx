@@ -18,8 +18,11 @@ import {
   Copy,
   Repeat,
   Layers,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import { Booking, BookingConflictInfo } from '../types';
+import { Booking, BookingConflictInfo, BookingChangeLog } from '../types';
 import { useBookingStore } from '../store/useBookingStore';
 import { formatDateTime, formatTime, getRecurrenceText } from '../utils/dateUtils';
 import { format } from 'date-fns';
@@ -46,7 +49,7 @@ interface EditFormData {
 }
 
 export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: BookingDetailModalProps) {
-  const { getRoomById, getActiveRooms, updateBooking, checkConflict, setPrefilledFormData, setIsModalOpen, setSelectedBooking, getRecurrenceBookings, deleteRecurrenceSeries, updateRecurrenceSeries, checkRecurrenceConflicts } = useBookingStore();
+  const { getRoomById, getActiveRooms, updateBooking, checkConflict, setPrefilledFormData, setIsModalOpen, setSelectedBooking, getRecurrenceBookings, deleteRecurrenceSeries, updateRecurrenceSeries, checkRecurrenceConflicts, getBookingChangeLogs } = useBookingStore();
   const [isEditing, setIsEditing] = useState(false);
   const [editMode, setEditMode] = useState<'single' | 'series'>('single');
   const [formData, setFormData] = useState<EditFormData | null>(null);
@@ -57,6 +60,7 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictInfos, setConflictInfos] = useState<BookingConflictInfo[]>([]);
+  const [showChangeLogs, setShowChangeLogs] = useState(false);
 
   const activeRooms = getActiveRooms();
 
@@ -710,6 +714,102 @@ export function BookingDetailModal({ booking, isOpen, onClose, onDelete }: Booki
                     </div>
                   </div>
                 )}
+
+                <div className="pt-2 border-t border-slate-100">
+                  <button
+                    onClick={() => setShowChangeLogs(!showChangeLogs)}
+                    className="w-full flex items-center justify-between py-2 text-sm text-slate-600 hover:text-blue-600 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <History className="w-4 h-4" />
+                      变更记录
+                    </span>
+                    {showChangeLogs ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {showChangeLogs && (
+                    <div className="mt-2 space-y-3 max-h-60 overflow-y-auto">
+                      {getBookingChangeLogs(booking.id).length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-4">暂无变更记录</p>
+                      ) : (
+                        getBookingChangeLogs(booking.id).map((log) => (
+                          <div
+                            key={log.id}
+                            className="p-3 bg-slate-50 rounded-lg border border-slate-100"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span
+                                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                  log.type === 'create'
+                                    ? 'bg-green-100 text-green-700'
+                                    : log.type === 'update'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-red-100 text-red-700'
+                                }`}
+                              >
+                                {log.type === 'create'
+                                  ? '新建'
+                                  : log.type === 'update'
+                                  ? '修改'
+                                  : '取消'}
+                              </span>
+                              <span className="text-xs text-slate-400">
+                                {format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm')}
+                              </span>
+                            </div>
+                            <p className="text-xs font-medium text-slate-700 mb-1.5">
+                              {log.description}
+                            </p>
+                            {log.changes.length > 0 && (
+                              <div className="space-y-1">
+                                {log.changes.map((change, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="text-xs text-slate-500 flex items-start gap-1"
+                                  >
+                                    <span className="text-slate-400">•</span>
+                                    <span>
+                                      <span className="text-slate-600">{change.label}：</span>
+                                      {log.type === 'create' ? (
+                                        <span className="text-green-600">
+                                          {Array.isArray(change.newValue)
+                                            ? change.newValue.join('、')
+                                            : change.newValue}
+                                        </span>
+                                      ) : log.type === 'cancel' ? (
+                                        <span className="text-red-600">
+                                          {String(change.newValue)}
+                                        </span>
+                                      ) : (
+                                        <>
+                                          <span className="text-slate-400 line-through">
+                                            {Array.isArray(change.oldValue)
+                                              ? change.oldValue.join('、')
+                                              : change.oldValue}
+                                          </span>
+                                          <span className="mx-1">→</span>
+                                          <span className="text-blue-600">
+                                            {Array.isArray(change.newValue)
+                                              ? change.newValue.join('、')
+                                              : change.newValue}
+                                          </span>
+                                        </>
+                                      )}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}

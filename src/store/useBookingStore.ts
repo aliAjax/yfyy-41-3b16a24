@@ -13,6 +13,9 @@ import {
   RecurrenceType,
   BookingConflictInfo,
   RecurrenceBookingResult,
+  BookingChangeLog,
+  RoomChangeLog,
+  FieldChange,
 } from '../types';
 import {
   getBookingsFromStorage,
@@ -26,6 +29,10 @@ import {
   getViewsFromStorage,
   addViewToStorage,
   deleteViewFromStorage,
+  addBookingChangeLog,
+  getBookingChangeLogsByBookingId,
+  addRoomChangeLog,
+  getRoomChangeLogsByRoomId,
 } from '../utils/storage';
 import { generateId, hasConflict, generateRecurrenceDates, getRecurrenceBookings, formatDateToLocalString } from '../utils/dateUtils';
 import { ImportResult, ParsedBookingRow, validateParsedRows } from '../utils/importUtils';
@@ -92,6 +99,9 @@ interface BookingStore {
   toggleRoomStatus: (id: string) => MeetingRoom | null;
   deleteRoom: (id: string) => { success: boolean; message: string };
   refreshRooms: () => void;
+
+  getBookingChangeLogs: (bookingId: string) => BookingChangeLog[];
+  getRoomChangeLogs: (roomId: string) => RoomChangeLog[];
 }
 
 export const useBookingStore = create<BookingStore>((set, get) => {
@@ -209,6 +219,24 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     saveBookingsToStorage(updatedBookings);
     set({ bookings: updatedBookings });
 
+    addBookingChangeLog({
+      bookingId: newBooking.id,
+      type: 'create',
+      timestamp: new Date().toISOString(),
+      changes: [
+        { field: 'title', label: '会议主题', oldValue: undefined, newValue: data.title },
+        { field: 'roomId', label: '会议室', oldValue: undefined, newValue: room.name },
+        { field: 'startTime', label: '开始时间', oldValue: undefined, newValue: data.startTime },
+        { field: 'endTime', label: '结束时间', oldValue: undefined, newValue: data.endTime },
+        { field: 'department', label: '使用科室', oldValue: undefined, newValue: data.department },
+        { field: 'attendees', label: '参会人数', oldValue: undefined, newValue: data.attendees },
+        { field: 'contact', label: '联系人', oldValue: undefined, newValue: data.contact },
+        { field: 'phone', label: '联系电话', oldValue: undefined, newValue: data.phone },
+        { field: 'remarks', label: '备注', oldValue: undefined, newValue: data.remarks || '' },
+      ],
+      description: '新建预订',
+    });
+
     return { success: true, message: '预定成功！' };
   },
 
@@ -237,6 +265,9 @@ export const useBookingStore = create<BookingStore>((set, get) => {
       return { success: false, message: '该时间段已有会议预定，请选择其他时间' };
     }
 
+    const oldBooking = bookings.find((b) => b.id === id);
+    const oldRoom = oldBooking ? getRoomById(oldBooking.roomId) : undefined;
+
     const updatedBooking = updateBookingInStorage(id, {
       ...data,
     });
@@ -244,6 +275,46 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     if (updatedBooking) {
       const updatedBookings = getBookingsFromStorage();
       set({ bookings: updatedBookings, selectedBooking: updatedBooking });
+
+      const changes: FieldChange[] = [];
+      if (oldBooking) {
+        if (oldBooking.title !== data.title) {
+          changes.push({ field: 'title', label: '会议主题', oldValue: oldBooking.title, newValue: data.title });
+        }
+        if (oldBooking.roomId !== data.roomId) {
+          changes.push({ field: 'roomId', label: '会议室', oldValue: oldRoom?.name, newValue: room.name });
+        }
+        if (oldBooking.startTime !== data.startTime) {
+          changes.push({ field: 'startTime', label: '开始时间', oldValue: oldBooking.startTime, newValue: data.startTime });
+        }
+        if (oldBooking.endTime !== data.endTime) {
+          changes.push({ field: 'endTime', label: '结束时间', oldValue: oldBooking.endTime, newValue: data.endTime });
+        }
+        if (oldBooking.department !== data.department) {
+          changes.push({ field: 'department', label: '使用科室', oldValue: oldBooking.department, newValue: data.department });
+        }
+        if (oldBooking.attendees !== data.attendees) {
+          changes.push({ field: 'attendees', label: '参会人数', oldValue: oldBooking.attendees, newValue: data.attendees });
+        }
+        if (oldBooking.contact !== data.contact) {
+          changes.push({ field: 'contact', label: '联系人', oldValue: oldBooking.contact, newValue: data.contact });
+        }
+        if (oldBooking.phone !== data.phone) {
+          changes.push({ field: 'phone', label: '联系电话', oldValue: oldBooking.phone, newValue: data.phone });
+        }
+        if ((oldBooking.remarks || '') !== (data.remarks || '')) {
+          changes.push({ field: 'remarks', label: '备注', oldValue: oldBooking.remarks || '', newValue: data.remarks || '' });
+        }
+      }
+
+      addBookingChangeLog({
+        bookingId: id,
+        type: 'update',
+        timestamp: new Date().toISOString(),
+        changes,
+        description: '修改预订',
+      });
+
       return { success: true, message: '修改成功！' };
     }
 
@@ -301,10 +372,24 @@ export const useBookingStore = create<BookingStore>((set, get) => {
   },
 
   deleteBooking: (id) => {
-    const { bookings } = get();
+    const { bookings, getRoomById } = get();
+    const booking = bookings.find((b) => b.id === id);
+    const room = booking ? getRoomById(booking.roomId) : undefined;
     const updatedBookings = bookings.filter((b) => b.id !== id);
     saveBookingsToStorage(updatedBookings);
     set({ bookings: updatedBookings, selectedBooking: null, isModalOpen: false });
+
+    if (booking) {
+      addBookingChangeLog({
+        bookingId: id,
+        type: 'cancel',
+        timestamp: new Date().toISOString(),
+        changes: [
+          { field: 'status', label: '状态', oldValue: '已预订', newValue: '已取消' },
+        ],
+        description: '取消预订',
+      });
+    }
   },
 
   checkRecurrenceConflicts: (roomId, startDate, endDate, startTime, endTime, type, excludeRecurrenceId) => {
@@ -697,19 +782,65 @@ export const useBookingStore = create<BookingStore>((set, get) => {
     const newRoom = addRoomToStorage(room);
     const rooms = getRoomsFromStorage();
     set({ rooms });
+
+    addRoomChangeLog({
+      roomId: newRoom.id,
+      type: 'create',
+      timestamp: new Date().toISOString(),
+      changes: [
+        { field: 'name', label: '会议室名称', oldValue: undefined, newValue: room.name },
+        { field: 'capacity', label: '容量', oldValue: undefined, newValue: room.capacity },
+        { field: 'location', label: '位置', oldValue: undefined, newValue: room.location },
+        { field: 'color', label: '标识颜色', oldValue: undefined, newValue: room.color },
+        { field: 'facilities', label: '设备标签', oldValue: undefined, newValue: room.facilities },
+      ],
+      description: '新增会议室',
+    });
+
     return newRoom;
   },
 
   updateRoom: (id, updates) => {
+    const { rooms } = get();
+    const oldRoom = rooms.find((r) => r.id === id);
     const updatedRoom = updateRoomInStorage(id, updates);
     if (updatedRoom) {
       const rooms = getRoomsFromStorage();
       set({ rooms });
+
+      const changes: FieldChange[] = [];
+      if (oldRoom) {
+        if (updates.name !== undefined && oldRoom.name !== updates.name) {
+          changes.push({ field: 'name', label: '会议室名称', oldValue: oldRoom.name, newValue: updates.name });
+        }
+        if (updates.capacity !== undefined && oldRoom.capacity !== updates.capacity) {
+          changes.push({ field: 'capacity', label: '容量', oldValue: oldRoom.capacity, newValue: updates.capacity });
+        }
+        if (updates.location !== undefined && oldRoom.location !== updates.location) {
+          changes.push({ field: 'location', label: '位置', oldValue: oldRoom.location, newValue: updates.location });
+        }
+        if (updates.color !== undefined && oldRoom.color !== updates.color) {
+          changes.push({ field: 'color', label: '标识颜色', oldValue: oldRoom.color, newValue: updates.color });
+        }
+        if (updates.facilities !== undefined && JSON.stringify(oldRoom.facilities) !== JSON.stringify(updates.facilities)) {
+          changes.push({ field: 'facilities', label: '设备标签', oldValue: oldRoom.facilities, newValue: updates.facilities });
+        }
+      }
+
+      addRoomChangeLog({
+        roomId: id,
+        type: 'update',
+        timestamp: new Date().toISOString(),
+        changes,
+        description: '编辑会议室',
+      });
     }
     return updatedRoom;
   },
 
   toggleRoomStatus: (id) => {
+    const { rooms } = get();
+    const oldRoom = rooms.find((r) => r.id === id);
     const updatedRoom = toggleRoomStatusInStorage(id);
     if (updatedRoom) {
       const rooms = getRoomsFromStorage();
@@ -721,6 +852,22 @@ export const useBookingStore = create<BookingStore>((set, get) => {
           set({ selectedRoomId: firstActive.id });
         }
       }
+
+      const isActivating = updatedRoom.status === 'active';
+      addRoomChangeLog({
+        roomId: id,
+        type: isActivating ? 'activate' : 'deactivate',
+        timestamp: new Date().toISOString(),
+        changes: [
+          {
+            field: 'status',
+            label: '状态',
+            oldValue: oldRoom?.status === 'active' ? '启用' : '停用',
+            newValue: isActivating ? '启用' : '停用',
+          },
+        ],
+        description: isActivating ? '启用会议室' : '停用会议室',
+      });
     }
     return updatedRoom;
   },
@@ -749,6 +896,14 @@ export const useBookingStore = create<BookingStore>((set, get) => {
   refreshRooms: () => {
     const rooms = getRoomsFromStorage();
     set({ rooms });
+  },
+
+  getBookingChangeLogs: (bookingId) => {
+    return getBookingChangeLogsByBookingId(bookingId);
+  },
+
+  getRoomChangeLogs: (roomId) => {
+    return getRoomChangeLogsByRoomId(roomId);
   },
 };
 });

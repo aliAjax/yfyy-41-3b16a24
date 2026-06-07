@@ -1,4 +1,4 @@
-import { Booking, BookingTemplate, MeetingRoom, SavedView } from '../types';
+import { Booking, BookingTemplate, MeetingRoom, SavedView, BookingChangeLog, RoomChangeLog } from '../types';
 import { STORAGE_KEYS, DEFAULT_MEETING_ROOMS } from '../constants';
 
 export function getBookingsFromStorage(): Booking[] {
@@ -188,4 +188,78 @@ export function updateViewInStorage(id: string, updates: Partial<Omit<SavedView,
   views[index] = { ...views[index], ...updates };
   saveViewsToStorage(views);
   return views[index];
+}
+
+export function getBookingChangeLogsFromStorage(): BookingChangeLog[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.BOOKING_CHANGE_LOGS);
+    if (!data) return [];
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Failed to load booking change logs from storage:', error);
+    return [];
+  }
+}
+
+export function saveBookingChangeLogsToStorage(logs: BookingChangeLog[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.BOOKING_CHANGE_LOGS, JSON.stringify(logs));
+  } catch (error) {
+    console.error('Failed to save booking change logs to storage:', error);
+  }
+}
+
+export function addBookingChangeLog(log: Omit<BookingChangeLog, 'id'>): BookingChangeLog {
+  const logs = getBookingChangeLogsFromStorage();
+  const newLog: BookingChangeLog = {
+    ...log,
+    id: `bcl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+  };
+  logs.push(newLog);
+  saveBookingChangeLogsToStorage(logs);
+  return newLog;
+}
+
+export function getBookingChangeLogsByBookingId(bookingId: string): BookingChangeLog[] {
+  const logs = getBookingChangeLogsFromStorage();
+  return logs
+    .filter((log) => log.bookingId === bookingId)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
+export function getRoomChangeLogsFromStorage(): RoomChangeLog[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.ROOM_CHANGE_LOGS);
+    if (!data) return [];
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Failed to load room change logs from storage:', error);
+    return [];
+  }
+}
+
+export function saveRoomChangeLogsToStorage(logs: RoomChangeLog[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ROOM_CHANGE_LOGS, JSON.stringify(logs));
+  } catch (error) {
+    console.error('Failed to save room change logs to storage:', error);
+  }
+}
+
+export function addRoomChangeLog(log: Omit<RoomChangeLog, 'id'>): RoomChangeLog {
+  const logs = getRoomChangeLogsFromStorage();
+  const newLog: RoomChangeLog = {
+    ...log,
+    id: `rcl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+  };
+  logs.push(newLog);
+  saveRoomChangeLogsToStorage(logs);
+  return newLog;
+}
+
+export function getRoomChangeLogsByRoomId(roomId: string): RoomChangeLog[] {
+  const logs = getRoomChangeLogsFromStorage();
+  return logs
+    .filter((log) => log.roomId === roomId)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }

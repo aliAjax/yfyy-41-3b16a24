@@ -51,6 +51,8 @@ export const STORAGE_KEYS = {
   TEMPLATES: 'meeting_room_templates',
   ROOMS: 'meeting_rooms_data',
   VIEWS: 'meeting_room_saved_views',
+  BOOKING_CHANGE_LOGS: 'meeting_room_booking_change_logs',
+  ROOM_CHANGE_LOGS: 'meeting_room_change_logs',
 };
 
 export const BUSINESS_START_HOUR = 8;

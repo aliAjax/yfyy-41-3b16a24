@@ -140,3 +140,31 @@ export interface SavedView {
   selectedDepartment: string;
   createdAt: string;
 }
+
+export type BookingChangeType = 'create' | 'update' | 'cancel';
+export type RoomChangeType = 'create' | 'update' | 'activate' | 'deactivate';
+
+export interface FieldChange {
+  field: string;
+  label: string;
+  oldValue: string | number | boolean | string[] | undefined;
+  newValue: string | number | boolean | string[] | undefined;
+}
+
+export interface BookingChangeLog {
+  id: string;
+  bookingId: string;
+  type: BookingChangeType;
+  timestamp: string;
+  changes: FieldChange[];
+  description: string;
+}
+
+export interface RoomChangeLog {
+  id: string;
+  roomId: string;
+  type: RoomChangeType;
+  timestamp: string;
+  changes: FieldChange[];
+  description: string;
+}
