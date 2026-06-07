@@ -144,7 +144,7 @@ yfyy-41/
 
 ## 本地存储（localStorage）
 
-所有数据均存储在浏览器 localStorage 中，共 6 个数据键：
+所有数据均存储在浏览器 localStorage 中，共 7 个数据键：
 
 | 数据键 | 存储内容 | 说明 |
 |--------|----------|------|
@@ -154,20 +154,22 @@ yfyy-41/
 | `meeting_room_saved_views` | 保存的视图数组 | 用户保存的快捷视图配置 |
 | `meeting_room_booking_change_logs` | 预订变更日志数组 | 预订的创建 / 修改 / 取消记录 |
 | `meeting_room_change_logs` | 会议室变更日志数组 | 会议室的增删改 / 启停记录 |
+| `theme` | 主题字符串 | `light` 或 `dark`，首次加载跟随系统偏好 |
 
 ### 数据重置
 
 如需清除所有本地数据恢复初始状态，在浏览器控制台执行：
 
 ```javascript
-Object.values({
-  BOOKINGS: 'meeting_room_bookings',
-  TEMPLATES: 'meeting_room_templates',
-  ROOMS: 'meeting_rooms_data',
-  VIEWS: 'meeting_room_saved_views',
-  BOOKING_CHANGE_LOGS: 'meeting_room_booking_change_logs',
-  ROOM_CHANGE_LOGS: 'meeting_room_change_logs',
-}).forEach(key => localStorage.removeItem(key));
+[
+  'meeting_room_bookings',
+  'meeting_room_templates',
+  'meeting_rooms_data',
+  'meeting_room_saved_views',
+  'meeting_room_booking_change_logs',
+  'meeting_room_change_logs',
+  'theme',
+].forEach(key => localStorage.removeItem(key));
 location.reload();
 ```
 
